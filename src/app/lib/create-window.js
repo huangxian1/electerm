@@ -43,7 +43,8 @@ exports.createWindow = async function (userConfig) {
       preload: resolve(__dirname, '../preload/preload.js'),
       webviewTag: true,
       devTools: !userConfig.disableDeveloperTool,
-      spellcheck: false
+      spellcheck: false,
+      backgroundThrottling: false
     },
     titleBarStyle: useSystemTitleBar ? 'default' : 'hidden',
     icon: iconPath

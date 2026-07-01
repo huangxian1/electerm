@@ -19,22 +19,29 @@ const onWatch = _.debounce(() => {
 }, 300, { leading: false, trailing: true })
 
 exports.watchFile = (path) => {
+  const oldPath = globalState.get('watchFilePath')
+  if (oldPath && oldPath !== path) {
+    fs.unwatchFile(oldPath, onWatch)
+  }
   globalState.set('watchFilePath', path)
   fs.watchFile(path, onWatch)
 }
 
 exports.unwatchFile = (path) => {
+  const filePath = path || globalState.get('watchFilePath')
+  if (filePath) {
+    fs.unwatchFile(filePath, onWatch)
+  }
   globalState.set('watchFilePath', '')
-  fs.unwatchFile(path, onWatch)
 }
 
 exports.cleanWatchFile = () => {
-  globalState.set('watchFilePath', '')
   const filePath = globalState.get('watchFilePath')
   if (!filePath) {
     return
   }
   fs.unwatchFile(filePath, onWatch)
+  globalState.set('watchFilePath', '')
 }
 
 process.on('exit', exports.cleanWatchFile)

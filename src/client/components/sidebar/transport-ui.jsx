@@ -8,7 +8,8 @@ import {
   CloseCircleOutlined,
   PlayCircleOutlined,
   PauseCircleOutlined,
-  VerticalAlignTopOutlined
+  VerticalAlignTopOutlined,
+  FolderOpenOutlined
 } from '@ant-design/icons'
 import { action } from 'manate'
 import { addClass, removeClass } from '../../common/class'
@@ -58,6 +59,14 @@ export default function Transporter (props) {
         pausing: !pausing
       }
     )
+  }
+
+  function handleOpenFile () {
+    const filePath = toPathReal || toPath
+    if (filePath) {
+      window.fs.openFile(filePath)
+        .catch(window.store.onError)
+    }
   }
 
   function clearCls () {
@@ -224,6 +233,17 @@ export default function Transporter (props) {
         >{toPathReal || toPath}
         </span>
       </Flex>
+      {typeTo === 'local' && percent === 100 && !error
+        ? (
+          <Flex>
+            <FolderOpenOutlined
+              className='transfer-control-icon pointer hover-black font14'
+              onClick={handleOpenFile}
+              title={e('open')}
+            />
+          </Flex>
+          )
+        : null}
       <Flex>
         <span
           className='sftp-file-percent'

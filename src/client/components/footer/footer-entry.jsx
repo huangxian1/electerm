@@ -5,6 +5,7 @@ import {
 import { InfoCircleOutlined } from '@ant-design/icons'
 import './footer.styl'
 import { statusMap } from '../../common/constants'
+import getSidebarWidth from '../../common/sidebar-width'
 import BatchInput from './batch-input'
 import encodes from '../bookmark-form/common/encodes'
 import { refs } from '../common/ref'
@@ -143,9 +144,11 @@ export default auto(function FooterEntry (props) {
   const {
     leftSidebarWidth,
     openedSideBar,
-    inActiveTerminal
+    inActiveTerminal,
+    config
   } = props.store
-  const w = 43 + leftSidebarWidth
+  const sidebarBaseWidth = getSidebarWidth(config)
+  const w = sidebarBaseWidth + leftSidebarWidth
   const sideProps = openedSideBar
     ? {
         className: 'main-footer',
@@ -154,7 +157,10 @@ export default auto(function FooterEntry (props) {
         }
       }
     : {
-        className: 'main-footer'
+        className: 'main-footer',
+        style: {
+          left: `${sidebarBaseWidth}px`
+        }
       }
   if (
     !inActiveTerminal

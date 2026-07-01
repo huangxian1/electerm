@@ -7,6 +7,7 @@ import SettingAi from '../ai/ai-config'
 import SyncSetting from '../setting-sync/setting-sync'
 import Shortcuts from '../shortcuts/shortcuts'
 import SettingPasswords from './setting-passwords'
+import SettingSidebar from './setting-sidebar'
 import List from './list'
 import {
   settingMap,
@@ -14,7 +15,8 @@ import {
   settingTerminalId,
   settingAiId,
   settingShortcutsId,
-  settingPasswordsId
+  settingPasswordsId,
+  settingSidebarId
 } from '../../common/constants'
 import { aiConfigsArr } from '../ai/ai-config-props'
 import { pick } from 'lodash-es'
@@ -67,6 +69,8 @@ export default auto(function TabSettings (props) {
     elem = <SettingAi {...aiConfProps} />
   } else if (sid === settingTerminalId) {
     elem = <SettingTerminal {...listProps} config={store.config} />
+  } else if (sid === settingSidebarId) {
+    elem = <SettingSidebar store={store} config={store.config} />
   } else if (sid === settingShortcutsId) {
     const shortcutsProps = {
       quickCommands: store.quickCommands,

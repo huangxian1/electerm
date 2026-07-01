@@ -6,6 +6,7 @@ import {
   quickCommandBoxHeight,
   footerHeight
 } from '../../common/constants'
+import getSidebarWidth from '../../common/sidebar-width'
 import layoutAlg from './layout-alg'
 import calcSessionSize from './session-size-alg'
 import TermSearch from '../terminal/term-search'
@@ -43,7 +44,8 @@ export default auto(function Layout (props) {
       inActiveTerminal
     } = props.store
     const h = height - footerHeight - (inActiveTerminal && pinnedQuickCommandBar ? quickCommandBoxHeight : 0) + resizeTrigger
-    const l = pinned ? 43 + leftSidebarWidth : 43
+    const sidebarBaseWidth = getSidebarWidth(config)
+    const l = pinned ? sidebarBaseWidth + leftSidebarWidth : sidebarBaseWidth
     const r = rightPanelVisible && rightPanelPinned ? rightPanelWidth : 0
     return {
       height: h,
@@ -63,11 +65,13 @@ export default auto(function Layout (props) {
       rightPanelVisible,
       rightPanelPinned,
       rightPanelWidth,
-      pinned
+      pinned,
+      config
     } = props.store
+    const sidebarBaseWidth = getSidebarWidth(config)
     const l = pinned ? leftSidebarWidth : 0
     const r = rightPanelPinned && rightPanelVisible ? rightPanelWidth : 0
-    const w = width - l - r - 42
+    const w = width - l - r - sidebarBaseWidth
     const h = height - footerHeight - (pinnedQuickCommandBar ? quickCommandBoxHeight : 0)
     return layoutAlg(layout, w, h)
   }
@@ -154,7 +158,8 @@ export default auto(function Layout (props) {
     'inActiveTerminal',
     'leftSidebarWidth',
     'openedSideBar',
-    'currentQuickCommands'
+    'currentQuickCommands',
+    'config'
   ])
   const sessionsProps = {
     styles: styles.wrapStyles,

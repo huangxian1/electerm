@@ -4,10 +4,23 @@
   margin 5px 5px 0 0
 .font-sel
   min-width 200px
+.setting-sidebar-config
+  max-width 560px
+.sidebar-setting-row
+  display flex
+  align-items center
+  justify-content space-between
+  gap 16px
+  min-height 42px
+  border-bottom 1px solid var(--border)
+  color var(--text)
+.sidebar-setting-label
+  color var(--text)
+  line-height 20px
 .setting-wrap .app-drag
   position fixed
   top 0
-  left 43px
+  left var(--sidebar-width, 43px)
   height 60px
   right 0
   z-index 888

@@ -3,7 +3,7 @@
  */
 
 import { memo, useState } from 'react'
-import { CloseOutlined } from '@ant-design/icons'
+import { CloseOutlined, FolderOpenOutlined } from '@ant-design/icons'
 import { Table } from 'antd'
 import time from '../../common/time'
 import Tag from '../sftp/transfer-tag'
@@ -73,8 +73,26 @@ export default memo(function TransferHistoryModal (props) {
     key: 'toPath',
     render: (txt, inst) => {
       const t = inst.toPathReal || txt
+      const isDownload = inst.typeTo === 'local'
+      const handleOpen = (e) => {
+        e.stopPropagation()
+        if (t) {
+          window.fs.openFile(t).catch(window.store.onError)
+        }
+      }
       return (
-        <div className='sftp-file history-file' title={t}>{t}</div>
+        <div className='history-file-wrap'>
+          <div className='sftp-file history-file' title={t}>{t}</div>
+          {isDownload
+            ? (
+              <FolderOpenOutlined
+                className='history-open-icon pointer'
+                onClick={handleOpen}
+                title={e('open')}
+              />
+              )
+            : null}
+        </div>
       )
     },
     sorter: sorterFactory('toPath')

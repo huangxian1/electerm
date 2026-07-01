@@ -53,6 +53,8 @@ export default class Sftp extends Component {
       ready: false
     }
     this.retryCount = 0
+    this.remoteListRequestId = 0
+    this.remoteListCancelToken = null
   }
 
   componentDidMount () {
@@ -105,6 +107,8 @@ export default class Sftp extends Component {
     refs.remove(this.id)
     this.sftp && this.sftp.destroy()
     this.sftp = null
+    this.remoteListCancelToken?.cancel()
+    this.remoteListCancelToken = null
     clearTimeout(this.timer4)
     this.timer4 = null
     clearTimeout(this.timer5)
@@ -688,11 +692,46 @@ export default class Sftp extends Component {
       })
   }
 
+  createRemoteListCancelToken = () => {
+    this.remoteListCancelToken?.cancel()
+    const token = {
+      cancelled: false,
+      cancel: null,
+      promise: null
+    }
+    token.promise = new Promise((resolve, reject) => {
+      token.cancel = () => {
+        if (token.cancelled) {
+          return
+        }
+        token.cancelled = true
+        const error = new Error('remote list cancelled')
+        error.isRemoteListCancelled = true
+        reject(error)
+      }
+    })
+    this.remoteListCancelToken = token
+    return token
+  }
+
+  withRemoteListCancel = (promise, token) => {
+    return token
+      ? Promise.race([promise, token.promise])
+      : promise
+  }
+
   remoteList = async (
     returnList = false,
     remotePathReal,
     oldPath
   ) => {
+    const requestId = returnList
+      ? this.remoteListRequestId
+      : ++this.remoteListRequestId
+    const isLatestRequest = () => returnList || requestId === this.remoteListRequestId
+    const cancelToken = returnList
+      ? null
+      : this.createRemoteListCancelToken()
     const { tab, sessionOptions } = this.props
     const { username, startDirectory } = tab
     let remotePath
@@ -711,7 +750,10 @@ export default class Sftp extends Component {
     let sftp = this.sftp
     try {
       if (!this.sftp) {
-        sftp = await Client(this.terminalId, this.type, this.port)
+        sftp = await this.withRemoteListCancel(
+          Client(this.terminalId, this.type, this.port),
+          cancelToken
+        )
         if (!sftp) {
           return
         }
@@ -729,23 +771,25 @@ export default class Sftp extends Component {
           proxy: getProxy(tab, config),
           ...sessionOptions
         })
-        const r = await sftp.connect(opts)
-          .catch(e => {
-            if (
-              e &&
-              e.message.includes(unexpectedPacketErrorDesc) && this.retryCount
-            ) {
-              this.retryHandler = setTimeout(
-                () => this.initData(
-                  true
-                ),
-                sftpRetryInterval
-              )
-              this.retryCount++
-            } else {
-              throw e
-            }
-          })
+        const r = await this.withRemoteListCancel(
+          sftp.connect(opts),
+          cancelToken
+        ).catch(e => {
+          if (
+            e &&
+            e.message.includes(unexpectedPacketErrorDesc) && this.retryCount
+          ) {
+            this.retryHandler = setTimeout(
+              () => this.initData(
+                true
+              ),
+              sftpRetryInterval
+            )
+            this.retryCount++
+          } else {
+            throw e
+          }
+        })
         this.setState(() => {
           return {
             loadingSftp: false
@@ -765,11 +809,20 @@ export default class Sftp extends Component {
         if (startDirectory) {
           remotePath = normalizeRemotePath(startDirectory)
         } else {
-          remotePath = await this.getPwd(username)
+          remotePath = await this.withRemoteListCancel(
+            this.getPwd(username),
+            cancelToken
+          )
         }
       }
 
-      const remote = await this.sftpList(sftp, remotePath)
+      const remote = await this.withRemoteListCancel(
+        this.sftpList(sftp, remotePath),
+        cancelToken
+      )
+      if (!isLatestRequest()) {
+        return
+      }
       this.sftp = sftp
       const update = {
         remote,
@@ -794,21 +847,30 @@ export default class Sftp extends Component {
       }
       this.setState(update, () => {
         if (this.type !== 'ftp') {
-          this.updateRemoteList(remote, remotePath, sftp)
+          this.updateRemoteList(remote, remotePath, sftp, requestId)
         }
         this.props.editTab(tab.id, {
           sftpCreated: true
         })
       })
       this.timer5 = setTimeout(() => {
+        if (!isLatestRequest()) {
+          return
+        }
         if (this.type !== 'ftp') {
-          this.updateRemoteList(remote, remotePath, sftp)
+          this.updateRemoteList(remote, remotePath, sftp, requestId)
         }
         this.props.editTab(tab.id, {
           sftpCreated: true
         })
       }, 1000)
     } catch (e) {
+      if (e && e.isRemoteListCancelled) {
+        return
+      }
+      if (!isLatestRequest()) {
+        return
+      }
       const update = {
         remoteLoading: false,
         remote: oldRemote,
@@ -820,16 +882,25 @@ export default class Sftp extends Component {
       }
       this.setState(update)
       this.onError(e)
+    } finally {
+      if (cancelToken && this.remoteListCancelToken === cancelToken) {
+        this.remoteListCancelToken = null
+      }
     }
   }
 
   updateRemoteList = async (
     remotes,
     remotePath,
-    sftp
+    sftp,
+    requestId
   ) => {
+    const isLatestRequest = () => !requestId || requestId === this.remoteListRequestId
     const remote = []
     for (const r of remotes) {
+      if (!isLatestRequest()) {
+        return
+      }
       const { name } = r
       if (r.isSymbol) {
         const linkPath = resolve(remotePath, name)
@@ -844,6 +915,13 @@ export default class Sftp extends Component {
         if (!isAbsPath(realpath)) {
           realpath = resolve(remotePath, realpath)
           realpath = await sftp.realpath(realpath)
+            .catch(e => {
+              console.debug(e)
+              return null
+            })
+        }
+        if (!realpath) {
+          continue
         }
         const realFileInfo = await getRemoteFileInfo(
           sftp,
@@ -862,6 +940,9 @@ export default class Sftp extends Component {
         r.isSymbolicLink = false
       }
       remote.push(r)
+    }
+    if (!isLatestRequest()) {
+      return
     }
     const update = {
       remote,

@@ -7,7 +7,9 @@ import { refs } from '../components/common/ref'
 export default Store => {
   Store.prototype.focus = function () {
     window.focused = true
-    refs.get('term-' + window.store.activeTabId)?.term?.focus()
+    const termRef = refs.get('term-' + window.store.activeTabId)
+    termRef?.term?.focus()
+    termRef?.recoverOnWindowFocus?.()
   }
 
   Store.prototype.blur = function () {

@@ -2,14 +2,14 @@
   background var(--main)
   height 36px
   position absolute
-  left 44px
+  left var(--sidebar-width, 43px)
   right 0
   bottom 0
   z-index 200
 .pinned
   .main-footer
   .qm-wrap-tooltip
-    left 343px
+    left calc(var(--sidebar-width, 43px) + 300px)
 
 .terminal-footer-flex
   display flex

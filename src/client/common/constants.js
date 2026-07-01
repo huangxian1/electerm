@@ -35,6 +35,7 @@ export const contextMenuWidth = 280
 export const contextMenuPaddingTop = 10
 export const sftpControlHeight = 42 + 30
 export const sidebarWidth = 43
+export const sidebarWidthWithLabels = 64
 export const maxHistory = 50
 export const maxTransport = 5
 export const maxSftpHistory = 20
@@ -221,6 +222,7 @@ export const settingShortcutsId = 'setting-shortcuts'
 export const settingAiId = 'setting-ai'
 export const settingCommonId = 'setting-common'
 export const settingPasswordsId = 'setting-passwords'
+export const settingSidebarId = 'setting-sidebar'
 export const defaultEnvLang = 'en_US.UTF-8'
 export const fileActions = {
   cancel: 'cancel',

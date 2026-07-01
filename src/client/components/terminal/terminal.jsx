@@ -210,6 +210,27 @@ class Term extends Component {
     }
   }
 
+  recoverOnWindowFocus = () => {
+    if (this.onClose || !this.term) {
+      return
+    }
+    this.onResize()
+    const socketClosed = this.socket &&
+      this.socket.readyState !== WebSocket.OPEN &&
+      this.socket.readyState !== WebSocket.CONNECTING
+    if (
+      socketClosed &&
+      this.props.tab.status === statusMap.success &&
+      this.props.tab.enableSsh !== false
+    ) {
+      const reconnectCount = (this.props.tab.autoReConnect || 0) + 1
+      this.props.reloadTab({
+        ...this.props.tab,
+        autoReConnect: reconnectCount
+      })
+    }
+  }
+
   getValue = (props, type, name) => {
     return type === 'glob'
       ? props.config[name]

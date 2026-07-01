@@ -1,4 +1,7 @@
 import {
+  useEffect
+} from 'react'
+import {
   BookOutlined,
   CloudSyncOutlined,
   InfoCircleOutlined,
@@ -16,12 +19,17 @@ import MenuBtn from '../sys-menu/menu-btn'
 import QuickConnect from '../tabs/quick-connect'
 import {
   sidebarWidth,
+  sidebarWidthWithLabels,
   settingMap,
   modals
 } from '../../common/constants'
 import SideIcon from './side-icon'
 import SidePanel from './side-panel'
 import hasActiveInput from '../../common/has-active-input'
+import {
+  getSidebarButtonLabel,
+  getSidebarButtonVisible
+} from './sidebar-buttons'
 import './sidebar.styl'
 
 const e = window.translate
@@ -46,6 +54,17 @@ export default function Sidebar (props) {
   } = props
 
   const { store } = window
+  const {
+    sidebarShowLabels,
+    sidebarButtons
+  } = store.config
+  const showLabels = sidebarShowLabels !== false
+  const currentSidebarWidth = showLabels ? sidebarWidthWithLabels : sidebarWidth
+  const isVisible = key => getSidebarButtonVisible(sidebarButtons, key)
+
+  useEffect(() => {
+    document.documentElement.style.setProperty('--sidebar-width', `${currentSidebarWidth}px`)
+  }, [currentSidebarWidth])
 
   const handleClickOutside = (event) => {
     // Don't close if pinned or has active input
@@ -116,55 +135,100 @@ export default function Sidebar (props) {
         className: 'sidebar-list'
       }
   const sidebarProps = {
-    className: `sidebar type-${openedSideBar}`,
+    className: `sidebar type-${openedSideBar}${showLabels ? ' with-labels' : ''}`,
     style: {
-      width: sidebarWidth,
+      width: currentSidebarWidth,
       height
     }
   }
   const transferProps = {
     fileTransfers,
     transferTab,
-    transferHistory
+    transferHistory,
+    showLabel: showLabels
   }
+  const sideIconCommonProps = key => ({
+    label: getSidebarButtonLabel(key),
+    showLabel: showLabels
+  })
   return (
     <div {...sidebarProps}>
       <div className='sidebar-bar btns'>
-        <div className='control-icon-wrap'>
-          <MenuBtn store={store} config={store.config} />
-        </div>
-        <SideIcon
-          title={e('newBookmark')}
-        >
-          <PlusCircleOutlined
-            className='font22 iblock control-icon'
-            onClick={onNewSsh}
-          />
-        </SideIcon>
-        <Popover
-          content={<QuickConnect inputOnly />}
-          trigger='click'
-          placement='right'
-        >
-          <div className='control-icon-wrap' title={e('quickConnect')}>
-            <ThunderboltOutlined
-              className='font20 iblock control-icon'
-            />
-          </div>
-        </Popover>
+        {
+          isVisible('menu')
+            ? (
+              <div className='control-icon-wrap'>
+                <MenuBtn store={store} config={store.config} />
+                {
+                  showLabels
+                    ? (
+                      <div className='control-icon-label'>
+                        {getSidebarButtonLabel('menu')}
+                      </div>
+                      )
+                    : null
+                }
+              </div>
+              )
+            : null
+        }
         <SideIcon
           title={e(settingMap.bookmarks)}
           active={bookmarksActive}
+          show={isVisible('bookmarks')}
+          {...sideIconCommonProps('bookmarks')}
         >
           <BookOutlined
             onClick={handleClickBookmark}
             className='font20 iblock control-icon'
           />
         </SideIcon>
-        <TransferList {...transferProps} />
+        <SideIcon
+          title={e('newBookmark')}
+          show={isVisible('newBookmark')}
+          {...sideIconCommonProps('newBookmark')}
+        >
+          <PlusCircleOutlined
+            className='font22 iblock control-icon'
+            onClick={onNewSsh}
+          />
+        </SideIcon>
+        {
+          isVisible('quickConnect')
+            ? (
+              <Popover
+                content={<QuickConnect inputOnly />}
+                trigger='click'
+                placement='right'
+              >
+                <div className='control-icon-wrap' title={e('quickConnect')}>
+                  <ThunderboltOutlined
+                    className='font20 iblock control-icon'
+                  />
+                  {
+                    showLabels
+                      ? (
+                        <div className='control-icon-label'>
+                          {getSidebarButtonLabel('quickConnect')}
+                        </div>
+                        )
+                      : null
+                  }
+                </div>
+              </Popover>
+              )
+            : null
+        }
+        {
+          isVisible('fileTransfers')
+            ? <TransferList {...transferProps} />
+            : null
+        }
         <SideIcon
           title={e(settingMap.terminalThemes)}
           active={themeActive}
+          show={isVisible('terminalThemes')}
+          {...sideIconCommonProps('terminalThemes')}
         >
           <PictureOutlined
             className='font20 iblock pointer control-icon'
@@ -174,12 +238,16 @@ export default function Sidebar (props) {
         <SideIcon
           title={e(settingMap.setting)}
           active={settingActive}
+          show={isVisible('setting')}
+          {...sideIconCommonProps('setting')}
         >
           <SettingOutlined className='iblock font20 control-icon' onClick={openSetting} />
         </SideIcon>
         <SideIcon
           title={e('settingSync')}
           active={syncActive}
+          show={isVisible('settingSync')}
+          {...sideIconCommonProps('settingSync')}
         >
           <CloudSyncOutlined
             className='iblock font20 control-icon'
@@ -190,6 +258,8 @@ export default function Sidebar (props) {
         <SideIcon
           title={e('widgets')}
           active={widgetsActive}
+          show={isVisible('widgets')}
+          {...sideIconCommonProps('widgets')}
         >
           <AppstoreOutlined className='iblock font20 control-icon' onClick={openWidgetsModal} />
         </SideIcon>
@@ -197,6 +267,8 @@ export default function Sidebar (props) {
         <SideIcon
           title={e('about')}
           active={showInfoModal}
+          show={isVisible('about')}
+          {...sideIconCommonProps('about')}
         >
           <InfoCircleOutlined
             className='iblock font16 control-icon open-about-icon'
@@ -204,7 +276,7 @@ export default function Sidebar (props) {
           />
         </SideIcon>
         {
-          !checkingRemoteVersion && !showUpgradeModal && shouldUpgrade
+          isVisible('upgrade') && !checkingRemoteVersion && !showUpgradeModal && shouldUpgrade
             ? (
               <Tooltip
                 title={`${e('upgrading')} ${upgradePercent || 0}%`}
@@ -217,6 +289,15 @@ export default function Sidebar (props) {
                     className='iblock font18 control-icon upgrade-icon'
                     onClick={handleShowUpgrade}
                   />
+                  {
+                    showLabels
+                      ? (
+                        <div className='control-icon-label'>
+                          {getSidebarButtonLabel('upgrade')}
+                        </div>
+                        )
+                      : null
+                  }
                 </div>
               </Tooltip>
               )

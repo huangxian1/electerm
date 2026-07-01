@@ -6,6 +6,8 @@ export default function SideIcon (props) {
     className,
     title = '',
     active,
+    label,
+    showLabel,
     children
   } = props
   if (show === false) {
@@ -20,6 +22,15 @@ export default function SideIcon (props) {
       title={title}
     >
       {children}
+      {
+        showLabel && label
+          ? (
+            <div className='control-icon-label'>
+              {label}
+            </div>
+            )
+          : null
+      }
     </div>
   )
 }

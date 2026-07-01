@@ -7,6 +7,9 @@ import {
   Popover
 } from 'antd'
 import TransferModal from './transfer-modal'
+import {
+  getSidebarButtonLabel
+} from './sidebar-buttons'
 import './transfer.styl'
 
 const e = window.translate
@@ -15,7 +18,8 @@ export default memo(function TransferList (props) {
   const {
     fileTransfers,
     transferTab,
-    transferHistory
+    transferHistory,
+    showLabel
   } = props
   const len = fileTransfers.length
   if (!len && !transferHistory.length) {
@@ -56,6 +60,15 @@ export default memo(function TransferList (props) {
           />
         </Badge>
       </Popover>
+      {
+        showLabel
+          ? (
+            <div className='control-icon-label'>
+              {getSidebarButtonLabel('fileTransfers')}
+            </div>
+            )
+          : null
+      }
     </div>
   )
 })

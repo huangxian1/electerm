@@ -19,7 +19,7 @@
   position absolute
   left 0
   top 0
-  width 36px
+  width var(--sidebar-width, 43px)
   z-index 100
   bottom 0
   background var(--main-dark)
@@ -81,8 +81,10 @@
   &:hover
     color var(--success)
 .control-icon-wrap
-  padding 14px 0
+  padding 11px 0
   text-align center
+  min-height 43px
+  box-sizing border-box
   &.active
     .control-icon
       color var(--text-light)
@@ -91,9 +93,25 @@
     cursor pointer
     &:hover
       color var(--text-light)
+.sidebar.with-labels
+  .control-icon-wrap
+    padding 7px 2px 6px
+    min-height 52px
+  .control-icon-label
+    color var(--text)
+    font-size 12px
+    line-height 16px
+    margin-top 3px
+    white-space normal
+    overflow hidden
+    text-overflow ellipsis
+    overflow-wrap anywhere
+    cursor default
+  .menu-logo
+    display inline-block
 .sidebar-list
   position absolute
-  left 43px
+  left var(--sidebar-width, 43px)
   top 0
   bottom 0
   z-index 200

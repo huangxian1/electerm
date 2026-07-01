@@ -3,7 +3,8 @@ import {
   settingShortcutsId,
   settingTerminalId,
   settingAiId,
-  settingPasswordsId
+  settingPasswordsId,
+  settingSidebarId
 } from '../common/constants'
 
 const e = window.translate
@@ -12,6 +13,10 @@ export default () => ([
   {
     id: settingTerminalId,
     title: e('terminal')
+  },
+  {
+    id: settingSidebarId,
+    title: '侧边栏'
   },
   {
     id: settingShortcutsId,

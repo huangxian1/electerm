@@ -170,7 +170,8 @@ export default auto(function SettingModalWrap (props) {
     showModal,
     hideSettingModal,
     innerWidth,
-    useSystemTitleBar
+    useSystemTitleBar,
+    config
   } = props.store
   const show = showModal === modals.setting
   if (!show) {
@@ -182,6 +183,7 @@ export default auto(function SettingModalWrap (props) {
       visible={show}
       useSystemTitleBar={useSystemTitleBar}
       innerWidth={innerWidth}
+      sidebarShowLabels={config.sidebarShowLabels !== false}
     >
       {renderTabs()}
     </SettingModal>

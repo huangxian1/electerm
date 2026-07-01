@@ -4,6 +4,7 @@
 
 import { useState, useRef } from 'react'
 import { quickCommandLabelsLsKey, pinnedQuickCommandBarKey } from '../../common/constants'
+import getSidebarWidth from '../../common/sidebar-width'
 import { sortBy } from 'lodash-es'
 import { Button, Input, Select, Space, Flex } from 'antd'
 import * as ls from '../../common/safe-local-storage'
@@ -156,7 +157,8 @@ export default function QuickCommandsFooterBox (props) {
     qmSortByFrequency,
     inActiveTerminal,
     leftSidebarWidth,
-    openedSideBar
+    openedSideBar,
+    config
   } = props
   if ((!openQuickCommandBar && !pinnedQuickCommandBar) || !inActiveTerminal) {
     return null
@@ -182,7 +184,8 @@ export default function QuickCommandsFooterBox (props) {
     : 'text'
   const cls = classNames('qm-list-wrap')
   const type = qmSortByFrequency ? 'primary' : 'default'
-  const w = openedSideBar ? 43 + leftSidebarWidth : 43
+  const sidebarBaseWidth = getSidebarWidth(config)
+  const w = openedSideBar ? sidebarBaseWidth + leftSidebarWidth : sidebarBaseWidth
   const qmProps = {
     className: 'qm-wrap-tooltip',
     style: {

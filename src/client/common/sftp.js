@@ -41,6 +41,15 @@ class Sftp {
         const uid = func + ':' + fid
         // let ws = await initWs()
         return new Promise((resolve, reject) => {
+          let settled = false
+          const done = (handler, value) => {
+            if (settled) {
+              return
+            }
+            settled = true
+            ws.cancelOnce(uid)
+            handler(value)
+          }
           ws.s({
             action: 'sftp-func',
             id,
@@ -53,9 +62,9 @@ class Sftp {
           ws.once((arg) => {
             if (arg.error) {
               console.debug('sftp error', arg.error.message)
-              return reject(new Error(arg.error.message))
+              return done(reject, new Error(arg.error.message))
             }
-            resolve(arg.data)
+            done(resolve, arg.data)
           }, uid)
         })
       }

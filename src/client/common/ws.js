@@ -114,6 +114,11 @@ class Ws {
     this.onceIds = []
   }
 
+  cancelOnce (id) {
+    delete onces[id]
+    this.onceIds = this.onceIds.filter(d => d !== id)
+  }
+
   close () {
     this.onclose()
     if (this.persist) {

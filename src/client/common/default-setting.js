@@ -77,5 +77,19 @@ export default {
   startDirectoryLocal: '',
   allowMultiInstance: false,
   disableDeveloperTool: false,
-  dragDropBehavior: 'ask'
+  dragDropBehavior: 'ask',
+  sidebarShowLabels: true,
+  sidebarButtons: {
+    menu: true,
+    bookmarks: true,
+    newBookmark: true,
+    quickConnect: true,
+    fileTransfers: true,
+    terminalThemes: true,
+    setting: true,
+    settingSync: true,
+    widgets: true,
+    about: true,
+    upgrade: true
+  }
 }
