@@ -55,6 +55,8 @@ export default class Sftp extends Component {
       showDiskSpace: true,
       diskSpaceData: null,
       diskSpaceLoading: false,
+      cpuUsage: '',
+      memUsage: '',
       treeView: false,
       remoteTreeView: true,
       expandedDirs: {}
@@ -121,6 +123,8 @@ export default class Sftp extends Component {
     this.timer4 = null
     clearTimeout(this.timer5)
     this.timer5 = null
+    clearInterval(this.cpuMemTimer)
+    this.cpuMemTimer = null
     // Clear sort cache to prevent memory leaks
     this._sortCache?.clear()
     this._lastSortArgs = null
@@ -575,6 +579,8 @@ export default class Sftp extends Component {
     await this.remoteList()
     this.remoteListOwner()
     this.handleFetchDiskSpace()
+    this.handleFetchCpuMem()
+    this.cpuMemTimer = setInterval(this.handleFetchCpuMem, 3000)
   }
 
   handleFetchDiskSpace = async () => {
@@ -595,6 +601,28 @@ export default class Sftp extends Component {
         diskSpaceData: e.message,
         diskSpaceLoading: false
       })
+    }
+  }
+
+  handleFetchCpuMem = async () => {
+    if (!this.sftp || !this.shouldRenderRemote()) {
+      return
+    }
+    try {
+      const cpuCmd = 'vmstat 1 2 | tail -1 | awk \'{print 100-$15}\''
+      const memCmd = 'awk \'/^MemTotal:/{t=$2} /^MemAvailable:/{a=$2} END{u=t-a; if(u<0)u=t; printf "%dG/%dG", u/1048576, t/1048576}\' /proc/meminfo'
+      const [cpuRes, memRes] = await Promise.all([
+        this.sftp.exec(cpuCmd),
+        this.sftp.exec(memCmd)
+      ])
+      const cpu = (cpuRes.stdout || '').trim()
+      const mem = (memRes.stdout || '').trim()
+      this.setState({
+        cpuUsage: cpu,
+        memUsage: mem
+      })
+    } catch (e) {
+      // ignore
     }
   }
 
@@ -1126,7 +1154,7 @@ export default class Sftp extends Component {
         // Reload current directory
         await this.remoteList()
         // Refresh expanded dirs in tree view
-        const treeViewRef = this.treeViewRef
+        const treeViewRef = this.treeViewRef.current
         if (treeViewRef) {
           await treeViewRef.refreshExpandedDirs()
         }
@@ -1438,9 +1466,16 @@ export default class Sftp extends Component {
   }
 
   renderSftpPanelTitle (type, username, host) {
+    const { cpuUsage, memUsage } = this.state
     if (type === typeMap.remote) {
       return (
         <div className='sftp-panel-title pd1t pd1b pd1x alignright'>
+          {cpuUsage && (
+            <span className='mg1r sftp-panel-cpu-mem'>CPU: {cpuUsage}%</span>
+          )}
+          {memUsage && (
+            <span className='mg1r sftp-panel-cpu-mem'>MEM: {memUsage}</span>
+          )}
           <ReloadOutlined
             className='mg1r pointer'
             onClick={this.handleReloadRemoteSftp}
