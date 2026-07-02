@@ -453,6 +453,7 @@ export default class SettingCommon extends Component {
       theme,
       customCss
     } = props.config
+    const currentLang = language || window.pre?.defaultLang || 'en_us'
     const {
       langs = []
     } = window.et
@@ -558,7 +559,7 @@ export default class SettingCommon extends Component {
           <span className='inline-title mg1r'>{e('language')}</span>
           <Select
             onChange={this.handleChangeLang}
-            value={language}
+            value={currentLang}
             popupMatchSelectWidth={false}
           >
             {
@@ -570,7 +571,7 @@ export default class SettingCommon extends Component {
               })
             }
           </Select>
-          <Link className='mg1l' to={createEditLangLink(language)}>{e('edit')}</Link>
+          <Link className='mg1l' to={createEditLangLink(currentLang)}>{e('edit')}</Link>
         </div>
         <div className='pd1b'>{e('default')} {e('execWindows')}</div>
         {

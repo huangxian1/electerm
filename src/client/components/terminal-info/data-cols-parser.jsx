@@ -1,12 +1,22 @@
 import { copy } from '../../common/clipboard'
 import filesizeParser from 'filesize-parser'
 import { filesize } from 'filesize'
+import { t } from '../../common/i18n-text'
 
 const valueParserMaps = {
   size: v => v,
   used: filesizeParser,
   avail: filesizeParser,
   usedPercent: v => parseFloat(v.replace('%', ''))
+}
+
+const columnTitleMap = {
+  filesystem: 'fileSystem',
+  size: 'size',
+  used: 'used',
+  avail: 'avail',
+  usedPercent: 'usedPercent',
+  mounted: 'mounted'
 }
 
 function valueParse (obj, k) {
@@ -39,8 +49,9 @@ export default (data) => {
         </div>
       )
     }
+    const titleKey = columnTitleMap[k] || k
     return {
-      title: k,
+      title: t(titleKey),
       dataIndex: k,
       key: k,
       sorter: (a, b) => {

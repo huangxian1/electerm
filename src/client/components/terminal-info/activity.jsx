@@ -6,8 +6,7 @@ import { Table, Tooltip, Popconfirm } from 'antd'
 import { isEmpty } from 'lodash-es'
 import { CloseCircleOutlined, BarsOutlined } from '@ant-design/icons'
 import colsParser from './data-cols-parser'
-
-const e = window.translate
+import { t } from '../../common/i18n-text'
 
 export default function TerminalInfoActivities (props) {
   const { activities, isRemote, terminalInfos } = props
@@ -18,14 +17,14 @@ export default function TerminalInfoActivities (props) {
   col.unshift({
     dataIndex: 'kill',
     key: 'kill',
-    title: e('close'),
+    title: t('close'),
     render: (txt, inst) => {
       return (
         <Tooltip
-          title={e('close')}
+          title={t('close')}
         >
           <Popconfirm
-            title={e('close') + ' pid:' + inst.pid + ' ?'}
+            title={t('close') + ' pid:' + inst.pid + ' ?'}
             onConfirm={() => props.killProcess(inst.pid)}
           >
             <CloseCircleOutlined
@@ -46,7 +45,7 @@ export default function TerminalInfoActivities (props) {
   }
   return (
     <div className='terminal-info-section terminal-info-act'>
-      <div className='pd1y bold'><BarsOutlined /> Activities</div>
+      <div className='pd1y bold'><BarsOutlined /> {t('activities')}</div>
       <Table {...ps} />
     </div>
   )

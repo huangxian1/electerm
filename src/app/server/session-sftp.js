@@ -367,6 +367,13 @@ class Sftp extends TerminalBase {
       })
   }
 
+  exec (cmd) {
+    return this.execBuffered(cmd)
+      .then(({ code, stdout, stderr }) => {
+        return { code, stdout, stderr }
+      })
+  }
+
   async getFolderSize (folderPath) {
     const platform = await this.getRemoteExecPlatform()
     const cmd = await this.buildRemoteCommand('folder-size', folderPath)

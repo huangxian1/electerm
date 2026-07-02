@@ -257,7 +257,7 @@ export default Store => {
   }
 
   Store.prototype.getLangName = function (
-    lang = window.store?.config.language || 'en_us'
+    lang = window.store?.config.language || window.pre?.defaultLang || 'en_us'
   ) {
     return get(window.langMap, `[${lang}].name`)
   }

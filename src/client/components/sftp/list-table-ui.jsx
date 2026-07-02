@@ -8,6 +8,7 @@ import classnames from 'classnames'
 import FileSection from './file-item'
 import PagedList from './paged-list'
 import FileListTableHeader from './file-table-header'
+import TreeView from './tree-view'
 import {
   CheckOutlined
 } from '@ant-design/icons'
@@ -345,7 +346,7 @@ export default class FileListTable extends Component {
   }
 
   render () {
-    const { fileList, height, type } = this.props
+    const { fileList, height, type, treeView } = this.props
     const containerHeight = height - 42 - 30 - 32 - 90
     const props = {
       ref: this.containerRef,
@@ -372,6 +373,30 @@ export default class FileListTable extends Component {
       trigger: ['contextMenu'],
       onOpenChange: this.handleDropdownOpenChange
     }
+
+    if (treeView) {
+      const containerHeight = height - 42 - 30 - 32 - 90
+      return (
+        <div className='sftp-tree-view-wrapper' style={{ height: containerHeight }}>
+          <TreeView
+            ref={this.props.treeViewRef}
+            fileList={fileList}
+            type={type}
+            sftp={this.props.sftp}
+            tab={this.props.tab}
+            modifier={this.props.modifier}
+            remoteList={this.props.remoteList}
+            localList={this.props.localList}
+            addTransferList={this.props.addTransferList}
+            remotePath={this.props.remotePath}
+            localPath={this.props.localPath}
+            getFolderFromFilePath={this.props.getFolderFromFilePath}
+            currentPath={this.props.currentPath}
+          />
+        </div>
+      )
+    }
+
     return (
       <div className={cls}>
         {this.renderTableHeader()}

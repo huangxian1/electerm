@@ -6,6 +6,12 @@ import { isEmpty } from 'lodash-es'
 import { Progress } from 'antd'
 import parseInt10 from '../../common/parse-int10'
 
+const nameMap = {
+  cpu: 'CPU',
+  mem: '内存',
+  swap: '交换空间'
+}
+
 function toNumber (n = '') {
   let f = 1
   if (n.includes('G')) {
@@ -51,14 +57,15 @@ export default function TerminalInfoResource (props) {
       percent,
       name
     } = obj
+    const displayName = nameMap[name] || name
     const hasPercent = Number.isFinite(percent)
     const p = hasPercent
       ? percent
       : computePercent(used, total) || 0
     const color = getColorForPercent(p)
     const fmt = hasPercent
-      ? (p) => `${name}: ${p || ''}%`
-      : (p) => `${name}: ${p || ''}%(${used || ''}/${total || ''})`
+      ? (p) => `${displayName}: ${p || ''}%`
+      : (p) => `${displayName}: ${p || ''}%(${used || ''}/${total || ''})`
     return (
       <div className='pd1b' key={name}>
         <Progress

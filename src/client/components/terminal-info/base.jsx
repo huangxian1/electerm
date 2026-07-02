@@ -21,8 +21,7 @@ import { refs } from '../common/ref'
 import ShowItem from '../common/show-item'
 import { osResolve } from '../../common/resolve'
 import createDefaultLogPath from '../../common/default-log-path'
-
-const e = window.translate
+import { t } from '../../common/i18n-text'
 
 const mapper = {
   uptime: <ClockCircleOutlined />,
@@ -31,6 +30,15 @@ const mapper = {
   activities: <BarsOutlined />,
   network: <ApiOutlined />,
   disks: <PartitionOutlined />
+}
+
+const labelMapper = {
+  uptime: 'runningTime',
+  cpu: 'cpu',
+  mem: 'memory',
+  activities: 'activities',
+  network: 'network',
+  disks: 'diskSpace'
 }
 
 export default class TerminalInfoBase extends Component {
@@ -121,7 +129,7 @@ export default class TerminalInfoBase extends Component {
     if (!saveTerminalLogToFile) {
       return null
     }
-    const name = e('addTimeStampToTermLog')
+    const name = t('addTimeStampToTermLog')
     return (
       <Switch
         checkedChildren={name}
@@ -142,6 +150,7 @@ export default class TerminalInfoBase extends Component {
         {
           defaults.terminalInfos.map(f => {
             const type = terminalInfos.includes(f) ? 'primary' : 'default'
+            const labelKey = labelMapper[f] || f
             return (
               <Button
                 key={f + 'term-info-sel'}
@@ -151,7 +160,7 @@ export default class TerminalInfoBase extends Component {
                 className='cap'
                 icon={mapper[f]}
               >
-                {f}
+                {t(labelKey)}
               </Button>
             )
           })
@@ -166,7 +175,7 @@ export default class TerminalInfoBase extends Component {
       logName
     } = this.props
     const { saveTerminalLogToFile, logPath, logFileName } = this.state
-    const name = e('saveTerminalLogToFile')
+    const name = t('saveTerminalLogToFile')
     const base = logPath || createDefaultLogPath()
     const fileName = logFileName || (logName + '.log')
     const fullPath = osResolve(base, fileName)
@@ -191,7 +200,7 @@ export default class TerminalInfoBase extends Component {
           saveTerminalLogToFile
             ? (
               <div className='pd1b font-xs color-grey'>
-                {e('terminalLogPath')}: {fullPath} <ShowItem to={fullPath} />
+                {t('terminalLogPath')}: {fullPath} <ShowItem to={fullPath} />
               </div>
               )
             : null

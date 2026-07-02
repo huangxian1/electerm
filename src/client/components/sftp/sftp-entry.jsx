@@ -1,4 +1,4 @@
-import { Component } from 'react'
+import React, { Component } from 'react'
 import { refs } from '../common/ref'
 import generate from '../../common/uid'
 import runIdle from '../../common/run-idle'
@@ -34,9 +34,10 @@ import * as owner from './owner-list'
 import AddressBar from './address-bar'
 import getProxy from '../../common/get-proxy'
 import { createTerm } from '../terminal/terminal-apis'
+import { t } from '../../common/i18n-text'
 import './sftp.styl'
 
-const e = window.translate
+const e = t
 
 export default class Sftp extends Component {
   constructor (props) {
@@ -50,11 +51,18 @@ export default class Sftp extends Component {
       ...this.defaultState(),
       loadingSftp: false,
       inited: false,
-      ready: false
+      ready: false,
+      showDiskSpace: true,
+      diskSpaceData: null,
+      diskSpaceLoading: false,
+      treeView: false,
+      remoteTreeView: true,
+      expandedDirs: {}
     }
     this.retryCount = 0
     this.remoteListRequestId = 0
     this.remoteListCancelToken = null
+    this.treeViewRef = React.createRef()
   }
 
   componentDidMount () {
@@ -566,6 +574,67 @@ export default class Sftp extends Component {
   initRemoteAll = async () => {
     await this.remoteList()
     this.remoteListOwner()
+    this.handleFetchDiskSpace()
+  }
+
+  handleFetchDiskSpace = async () => {
+    if (!this.sftp || !this.shouldRenderRemote()) {
+      return
+    }
+    this.setState({
+      diskSpaceLoading: true
+    })
+    try {
+      const result = await this.sftp.exec('df -h')
+      this.setState({
+        diskSpaceData: result.stdout || result.stderr,
+        diskSpaceLoading: false
+      })
+    } catch (e) {
+      this.setState({
+        diskSpaceData: e.message,
+        diskSpaceLoading: false
+      })
+    }
+  }
+
+  toggleDiskSpaceView = () => {
+    this.setState(prev => ({
+      showDiskSpace: !prev.showDiskSpace
+    }))
+  }
+
+  toggleTreeView = (type) => {
+    if (type === typeMap.remote) {
+      const newTreeView = !this.state.remoteTreeView
+      if (newTreeView) {
+        // Switching to tree view - clear cache and load from current path
+        this.setState({
+          remoteTreeView: true
+        }, () => {
+          if (this.treeViewRef.current) {
+            // Clear cache and reload
+            this.treeViewRef.current.clearAndReload(this.state.remotePath)
+          }
+        })
+      } else {
+        // Switching to table view - sync path from tree view
+        this.setState({ remoteTreeView: false })
+      }
+    } else {
+      this.setState(prev => ({
+        treeView: !prev.treeView
+      }))
+    }
+  }
+
+  toggleDirExpanded = (dirId) => {
+    this.setState(prev => ({
+      expandedDirs: {
+        ...prev.expandedDirs,
+        [dirId]: !prev.expandedDirs[dirId]
+      }
+    }))
   }
 
   modifier = (...args) => {
@@ -1039,6 +1108,35 @@ export default class Sftp extends Component {
   }
 
   handleReloadRemoteSftp = async () => {
+    // Check if terminal user has changed
+    const terminalUser = await this.getTerminalUser()
+    const { tab } = this.props
+    const sftpUser = tab.username
+
+    if (terminalUser && terminalUser !== sftpUser) {
+      // Terminal user changed, re-establish SFTP with new user
+      await this.reconnectSftpAsUser(terminalUser)
+      return
+    }
+
+    // If in tree view, refresh expanded dirs without collapsing
+    if (this.state.remoteTreeView) {
+      this.setState({ remoteLoading: true })
+      try {
+        // Reload current directory
+        await this.remoteList()
+        // Refresh expanded dirs in tree view
+        const treeViewRef = this.treeViewRef
+        if (treeViewRef) {
+          await treeViewRef.refreshExpandedDirs()
+        }
+      } catch (err) {
+        this.onError(err)
+      }
+      this.setState({ remoteLoading: false })
+      return
+    }
+
     if (this.sftp) {
       this.sftp.destroy()
       this.sftp = null
@@ -1050,6 +1148,47 @@ export default class Sftp extends Component {
     }, () => {
       this.initRemoteAll()
     })
+  }
+
+  // Get current terminal user by running whoami
+  getTerminalUser = async () => {
+    try {
+      const { runCmd } = await import('../terminal/terminal-apis')
+      const pid = this.terminalId
+      const result = await runCmd(pid, 'whoami')
+      return result?.trim()
+    } catch (err) {
+      console.error('Failed to get terminal user:', err)
+      return null
+    }
+  }
+
+  // Reconnect SFTP as a different user
+  reconnectSftpAsUser = async (newUsername) => {
+    // Destroy current SFTP connection
+    if (this.sftp) {
+      this.sftp.destroy()
+      this.sftp = null
+    }
+
+    // Update tab with new username (keep existing password/keys)
+    const { tab } = this.props
+    this.props.editTab(tab.id, {
+      username: newUsername
+    })
+
+    // Reset and re-establish connection
+    this.setState({
+      remoteLoading: true,
+      remote: [],
+      remoteFileTree: new Map(),
+      inited: false
+    })
+
+    // Small delay to ensure tab is updated
+    setTimeout(() => {
+      this.initRemoteAll()
+    }, 100)
   }
 
   handleUploadFromBrowser = () => {
@@ -1114,6 +1253,20 @@ export default class Sftp extends Component {
         message: 'path not valid'
       })
     }
+
+    // If in tree view mode, expand to path instead of loading new list
+    const isTreeView = type === typeMap.remote ? this.state.remoteTreeView : this.state.treeView
+    if (isTreeView && this.treeViewRef.current) {
+      this.setState({
+        [n]: np,
+        [nt]: np,
+        [`${type}Keyword`]: ''
+      }, () => {
+        this.treeViewRef.current.expandToPath(np)
+      })
+      return
+    }
+
     this.setState({
       [n]: np,
       [nt]: np,
@@ -1296,9 +1449,76 @@ export default class Sftp extends Component {
         </div>
       )
     }
+    const { showDiskSpace, diskSpaceLoading } = this.state
     return (
       <div className='sftp-panel-title pd1t pd1b pd1x'>
-        {e('local')}
+        <span
+          className={`sftp-tab ${showDiskSpace ? 'sftp-tab-active' : ''}`}
+          onClick={() => { if (!showDiskSpace) this.toggleDiskSpaceView() }}
+        >
+          {e('diskSpace')}
+        </span>
+        <span className='sftp-tab-separator'>|</span>
+        <span
+          className={`sftp-tab ${!showDiskSpace ? 'sftp-tab-active' : ''}`}
+          onClick={() => { if (showDiskSpace) this.toggleDiskSpaceView() }}
+        >
+          {e('localFiles')}
+        </span>
+        {showDiskSpace && (
+          <ReloadOutlined
+            className='mg1l pointer'
+            onClick={this.handleFetchDiskSpace}
+            title={e('refresh')}
+            spin={diskSpaceLoading}
+          />
+        )}
+      </div>
+    )
+  }
+
+  parseDfOutput (output) {
+    if (!output) return { headers: [], rows: [] }
+    const lines = output.trim().split('\n')
+    if (lines.length === 0) return { headers: [], rows: [] }
+    const headers = lines[0].split(/\s+/)
+    const rows = lines.slice(1).map(line => line.split(/\s+/))
+    return { headers, rows }
+  }
+
+  renderDiskSpace () {
+    const { diskSpaceData, diskSpaceLoading } = this.state
+    if (diskSpaceLoading) {
+      return (
+        <div className='disk-space-loading pd2'>
+          <LoadingOutlined /> {e('loading')}
+        </div>
+      )
+    }
+    if (!diskSpaceData) {
+      return (
+        <div className='disk-space-empty pd2'>
+          {e('noDiskSpaceData')}
+        </div>
+      )
+    }
+    const { headers, rows } = this.parseDfOutput(diskSpaceData)
+    return (
+      <div className='disk-space-wrap'>
+        <div className='disk-space-table'>
+          <div className='disk-space-header'>
+            {headers.map((h, i) => (
+              <div key={i} className='disk-space-header-item'>{h}</div>
+            ))}
+          </div>
+          {rows.map((row, idx) => (
+            <div key={idx} className='disk-space-row'>
+              {row.map((cell, i) => (
+                <div key={i} className='disk-space-cell'>{cell}</div>
+              ))}
+            </div>
+          ))}
+        </div>
       </div>
     )
   }
@@ -1310,11 +1530,27 @@ export default class Sftp extends Component {
     const arr = this.getFileList(type)
     const loading = this.state[`${type}Loading`]
     const { host, username } = this.props.tab
+    const showDiskSpaceView = type === typeMap.local && this.state.showDiskSpace && this.shouldRenderRemote()
+    const isRemote = type === typeMap.remote
+    const treeView = isRemote ? this.state.remoteTreeView : this.state.treeView
     const listProps = {
       store: window.store,
       id,
       type,
       parentItem: this.renderParentItem(type),
+      treeView,
+      treeViewRef: this.treeViewRef,
+      expandedDirs: this.state.expandedDirs,
+      toggleDirExpanded: this.toggleDirExpanded,
+      sftp: this.sftp,
+      modifier: this.modifier,
+      remoteList: this.remoteList,
+      localList: this.localList,
+      addTransferList: this.addTransferList,
+      remotePath: this.state.remotePath,
+      localPath: this.state.localPath,
+      getFolderFromFilePath,
+      currentPath: isRemote ? this.state.remotePath : this.state.localPath,
       ...this.props,
       ...pick(
         this,
@@ -1336,6 +1572,8 @@ export default class Sftp extends Component {
       host,
       type,
       handleUploadFromBrowser: this.handleUploadFromBrowser,
+      treeView,
+      toggleTreeView: () => this.toggleTreeView(type),
       ...pick(
         this,
         [
@@ -1376,16 +1614,26 @@ export default class Sftp extends Component {
             {
               this.renderSftpPanelTitle(type, username, host)
             }
-            <AddressBar
-              {...addrProps}
-            />
-            <div
-              className={`file-list ${type} relative`}
-            >
-              <ListTable
-                {...listProps}
-              />
-            </div>
+            {showDiskSpaceView
+              ? (
+                <div className='disk-space-wrap'>
+                  {this.renderDiskSpace()}
+                </div>
+                )
+              : (
+                <>
+                  <AddressBar
+                    {...addrProps}
+                  />
+                  <div
+                    className={`file-list ${type} relative`}
+                  >
+                    <ListTable
+                      {...listProps}
+                    />
+                  </div>
+                </>
+                )}
           </div>
         </Spin>
       </div>

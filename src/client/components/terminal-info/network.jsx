@@ -8,6 +8,7 @@ import { useEffect, useState } from 'react'
 import { filesize } from 'filesize'
 import copy from 'json-deep-copy'
 import { ApiOutlined } from '@ant-design/icons'
+import { t } from '../../common/i18n-text'
 
 export default function TerminalInfoDisk (props) {
   const { network, isRemote, terminalInfos } = props
@@ -81,8 +82,8 @@ export default function TerminalInfoDisk (props) {
   const map = {
     up: '↑',
     down: '↓',
-    name: 'name',
-    ip: 'ipv4'
+    name: '名称',
+    ip: 'IPv4'
   }
   const col = ['name', 'ip', 'up', 'down'].map((k, i) => {
     return {
@@ -110,7 +111,7 @@ export default function TerminalInfoDisk (props) {
   }
   return (
     <div className='terminal-info-section terminal-info-network'>
-      <div className='pd1y bold'><ApiOutlined /> Network</div>
+      <div className='pd1y bold'><ApiOutlined /> {t('network')}</div>
       <Table {...ps} />
     </div>
   )

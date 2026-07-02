@@ -7,7 +7,8 @@ import {
   ArrowRightOutlined,
   LoadingOutlined,
   HomeOutlined,
-  PlusOutlined
+  PlusOutlined,
+  ApartmentOutlined
 } from '@ant-design/icons'
 import {
   Input,
@@ -35,6 +36,7 @@ function renderAddonBefore (props, realPath) {
     type,
     updateKeyword: props.updateKeyword
   }
+  const isRemote = type === typeMap.remote
   return (
     <>
       <Tooltip
@@ -71,6 +73,18 @@ function renderAddonBefore (props, realPath) {
         className='mg1r'
         onClickHistory={props.onClickHistory}
       />
+      {isRemote && (
+        <Tooltip
+          title={e('treeView')}
+          arrow={{ pointAtCenter: true }}
+          placement='topLeft'
+        >
+          <ApartmentOutlined
+            onClick={() => props.toggleTreeView(type)}
+            className={`mg1r ${props.treeView ? 'color-primary' : ''}`}
+          />
+        </Tooltip>
+      )}
     </>
   )
 }
