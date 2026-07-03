@@ -41,6 +41,27 @@ import iconsMap from '../sys-menu/icons-map'
 
 const e = window.translate
 
+// Binary/non-text file extensions that should not be opened in the text editor
+const binaryExtensions = new Set([
+  'doc', 'docx', 'xls', 'xlsx', 'ppt', 'pptx', 'pdf', 'odt', 'ods', 'odp',
+  'rtf', 'pages', 'numbers', 'key',
+  'jpg', 'jpeg', 'png', 'gif', 'bmp', 'ico', 'svg', 'webp', 'tiff', 'tif',
+  'psd', 'ai', 'eps', 'raw', 'cr2', 'nef', 'heic', 'heif', 'avif',
+  'mp4', 'avi', 'mkv', 'mov', 'wmv', 'flv', 'webm', 'm4v', 'mpg', 'mpeg', '3gp', 'ts',
+  'mp3', 'wav', 'flac', 'aac', 'ogg', 'wma', 'm4a', 'opus', 'mid', 'midi',
+  'zip', 'rar', '7z', 'tar', 'gz', 'bz2', 'xz', 'zst', 'lz4', 'cab', 'iso', 'dmg', 'img',
+  'exe', 'dll', 'so', 'dylib', 'bin', 'dat', 'db', 'sqlite', 'mdb',
+  'class', 'jar', 'war', 'pyc', 'pyo', 'o', 'obj', 'lib', 'a',
+  'ttf', 'otf', 'woff', 'woff2', 'eot',
+  'torrent', 'bak', 'tmp', 'swf', 'fla'
+])
+
+function isEditableFile (name) {
+  if (!name) return false
+  const ext = name.split('.').pop()?.toLowerCase()
+  return !binaryExtensions.has(ext)
+}
+
 const fileItemCls = 'sftp-item'
 const onDragCls = 'sftp-ondrag'
 const onDragOverCls = 'sftp-dragover'
@@ -1007,7 +1028,7 @@ export default class FileSection extends React.Component {
     const delTxt = shouldShowSelectedMenu ? `${e('del')}:${e('selected')}(${len})` : e('del')
     const canPaste = hasFileInClipboardText()
     const showEdit = !isDirectory && id &&
-      size < maxEditFileSize
+      size < maxEditFileSize && isEditableFile(this.props.file.name)
     const res = []
     if (isDirectory && isRealFile) {
       res.push({

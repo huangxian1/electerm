@@ -11,11 +11,47 @@ function Write-Step {
 function Invoke-Checked {
   param(
     [string]$FilePath,
-    [string[]]$Arguments
+    [string[]]$Arguments,
+    [int]$TimeoutSec = 0
   )
-  & $FilePath @Arguments
-  if ($LASTEXITCODE -ne 0) {
-    throw "Command failed: $FilePath $($Arguments -join ' ')"
+  if ($TimeoutSec -gt 0) {
+    $proc = Start-Process -FilePath $FilePath -ArgumentList $Arguments -NoNewWindow -PassThru -Wait -TimeoutSec $TimeoutSec
+    if ($proc.ExitCode -ne 0) {
+      throw "Command failed (exit $($proc.ExitCode)): $FilePath $($Arguments -join ' ')"
+    }
+  } else {
+    & $FilePath @Arguments
+    if ($LASTEXITCODE -ne 0) {
+      throw "Command failed: $FilePath $($Arguments -join ' ')"
+    }
+  }
+}
+
+function Invoke-Tolerant {
+  param(
+    [string]$FilePath,
+    [string[]]$Arguments,
+    [string]$WarnMsg,
+    [int]$TimeoutSec = 0
+  )
+  try {
+    if ($TimeoutSec -gt 0) {
+      $proc = Start-Process -FilePath $FilePath -ArgumentList $Arguments -NoNewWindow -PassThru -Wait -TimeoutSec $TimeoutSec
+      if ($proc.ExitCode -ne 0) {
+        Write-Host "WARNING: $WarnMsg (exit $($proc.ExitCode))" -ForegroundColor Yellow
+        return $false
+      }
+    } else {
+      & $FilePath @Arguments
+      if ($LASTEXITCODE -ne 0) {
+        Write-Host "WARNING: $WarnMsg (exit $LASTEXITCODE)" -ForegroundColor Yellow
+        return $false
+      }
+    }
+    return $true
+  } catch {
+    Write-Host "WARNING: $WarnMsg ($($_.Exception.Message))" -ForegroundColor Yellow
+    return $false
   }
 }
 
@@ -65,7 +101,15 @@ function Restore-AutoStash {
     return
   }
   Write-Step 'Restoring local changes'
-  Invoke-Checked 'git' @('stash', 'pop')
+  try {
+    & git stash pop
+    if ($LASTEXITCODE -ne 0) {
+      Write-Host 'WARNING: git stash pop had conflicts. Run "git stash pop" manually to resolve.' -ForegroundColor Yellow
+    }
+  } catch {
+    Write-Host "WARNING: git stash pop failed: $($_.Exception.Message)" -ForegroundColor Yellow
+    Write-Host 'Run "git stash pop" manually to restore your changes.' -ForegroundColor Yellow
+  }
 }
 
 Write-Host 'Electerm Windows installer builder'
@@ -96,19 +140,37 @@ if ($status.Trim()) {
   Write-Host 'Working tree is clean.'
 }
 
+# Save original npm config so we can restore on failure
+$origRegistry = $null
+$origLegacyPeerDeps = $null
+$npmConfigChanged = $false
+
 try {
-  Write-Step 'Pulling latest code from GitHub'
+  Write-Step 'Checking remote updates'
   $branch = (& git branch --show-current).Trim()
   if (-not $branch) {
     throw 'Cannot detect current git branch.'
   }
-  Invoke-Checked 'git' @('fetch', 'origin')
-  Invoke-Checked 'git' @('pull', '--ff-only', 'origin', $branch)
+  $remoteBehind = 0
+  $fetchOk = Invoke-Tolerant 'git' @('fetch', 'origin') 'Failed to fetch from GitHub. Continuing with local code.' -TimeoutSec 30
+  if ($fetchOk) {
+    $remoteBehind = [int]((& git rev-list --count "HEAD..origin/$branch" 2>$null).Trim())
+  }
+  if ($remoteBehind -gt 0) {
+    Write-Host "Remote has $remoteBehind new commit(s). Skipping pull, using local code to build." -ForegroundColor Yellow
+  } else {
+    Write-Host 'Local code is up to date with remote.' -ForegroundColor Green
+  }
 
   Restore-AutoStash -DidStash $didStash
   $didStash = $false
 
   Write-Step 'Configuring npm mirrors and peer dependency mode'
+  # Save original values before modifying
+  $origRegistry = (& npm config get registry 2>$null).Trim()
+  $origLegacyPeerDeps = (& npm config get legacy-peer-deps 2>$null).Trim()
+  $npmConfigChanged = $true
+
   Invoke-Checked 'npm' @('config', 'set', 'legacy-peer-deps', 'true')
   Invoke-Checked 'npm' @('config', 'set', 'registry', 'https://registry.npmmirror.com')
   $env:ELECTRON_MIRROR = 'https://npmmirror.com/mirrors/electron/'
@@ -166,10 +228,36 @@ try {
 } catch {
   Write-Host ''
   Write-Host "ERROR: $($_.Exception.Message)" -ForegroundColor Red
+} finally {
+  # Always restore stash if it was created and not yet popped
   if ($didStash) {
-    Write-Host ''
-    Write-Host 'Local changes are still in git stash. Restore them with:' -ForegroundColor Yellow
-    Write-Host 'git stash pop'
+    Restore-AutoStash -DidStash $true
   }
-  exit 1
+  # Always restore original npm config if we changed it
+  if ($npmConfigChanged) {
+    Write-Host ''
+    Write-Step 'Restoring original npm config'
+    # Clean up env vars first to avoid npm warnings about unknown config
+    Remove-Item Env:ELECTRON_MIRROR -ErrorAction SilentlyContinue
+    Remove-Item Env:npm_config_electron_mirror -ErrorAction SilentlyContinue
+    Remove-Item Env:ELECTRON_BUILDER_BINARIES_MIRROR -ErrorAction SilentlyContinue
+    Remove-Item Env:npm_config_electron_builder_binaries_mirror -ErrorAction SilentlyContinue
+    if ($origRegistry) {
+      & npm config set registry $origRegistry 2>$null
+    } else {
+      & npm config delete registry 2>$null
+    }
+    if ($origLegacyPeerDeps -eq 'true') {
+      & npm config set legacy-peer-deps 'true' 2>$null
+    } else {
+      & npm config delete legacy-peer-deps 2>$null
+    }
+    Write-Host 'npm config restored.'
+  }
+  # Remind user if remote has newer commits
+  if ($remoteBehind -gt 0) {
+    Write-Host ''
+    Write-Host "NOTE: Remote branch '$branch' has $remoteBehind newer commit(s) than your local code." -ForegroundColor Yellow
+    Write-Host 'Run "git pull" manually to review and merge the updates.' -ForegroundColor Yellow
+  }
 }

@@ -646,13 +646,21 @@ export default class Sftp extends Component {
           }
         })
       } else {
-        // Switching to table view - sync path from tree view
-        this.setState({ remoteTreeView: false })
+        // Switching to table view - refresh file list for current path
+        this.setState({ remoteTreeView: false }, () => {
+          this.remoteList()
+        })
       }
     } else {
-      this.setState(prev => ({
-        treeView: !prev.treeView
-      }))
+      const newTreeView = !this.state.treeView
+      if (newTreeView) {
+        this.setState({ treeView: true })
+      } else {
+        // Switching to table view - refresh file list for current path
+        this.setState({ treeView: false }, () => {
+          this.localList()
+        })
+      }
     }
   }
 

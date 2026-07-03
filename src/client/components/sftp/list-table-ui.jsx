@@ -95,6 +95,26 @@ export default class FileListTable extends Component {
     e && e.dataTransfer && e.dataTransfer.clearData()
   }
 
+  handleTreeDragOver = e => {
+    e.preventDefault()
+  }
+
+  handleTreeDrop = e => {
+    e.preventDefault()
+    // Only handle external file drops (from OS file manager)
+    if (!e.dataTransfer?.files?.length) {
+      return
+    }
+    // If dropped on a tree node, the node's own onDrop already handles it
+    if (e.target.closest && e.target.closest('.tree-node-item')) {
+      return
+    }
+    const treeViewRef = this.props.treeViewRef
+    if (treeViewRef?.current) {
+      treeViewRef.current.onExternalDrop(e)
+    }
+  }
+
   componentDidUpdate (prevProps) {
     const prevList = prevProps.fileList
     const nextList = this.props.fileList
@@ -377,7 +397,12 @@ export default class FileListTable extends Component {
     if (treeView) {
       const containerHeight = height - 42 - 30 - 32 - 90
       return (
-        <div className='sftp-tree-view-wrapper' style={{ height: containerHeight }}>
+        <div
+          className='sftp-tree-view-wrapper'
+          style={{ height: containerHeight }}
+          onDragOver={this.handleTreeDragOver}
+          onDrop={this.handleTreeDrop}
+        >
           <TreeView
             ref={this.props.treeViewRef}
             fileList={fileList}

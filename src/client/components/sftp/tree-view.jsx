@@ -6,9 +6,6 @@
 import React, { Component, createRef } from 'react'
 import { Input } from 'antd'
 import {
-  FolderOutlined,
-  FolderOpenOutlined,
-  FileOutlined,
   RightOutlined,
   DownOutlined,
   FileAddOutlined,
@@ -18,16 +15,50 @@ import {
   CopyOutlined,
   ScissorOutlined,
   SnippetsOutlined,
-  LoadingOutlined
+  LoadingOutlined,
+  CloudUploadOutlined,
+  CloudDownloadOutlined,
+  CodeOutlined,
+  EnterOutlined,
+  ContainerOutlined,
+  ReloadOutlined,
+  LockOutlined,
+  InfoCircleOutlined,
+  CheckSquareOutlined
 } from '@ant-design/icons'
 import classnames from 'classnames'
 import resolve from '../../common/resolve'
-import { fileOperationsMap, typeMap, ctrlOrCmd, isMac } from '../../common/constants'
+import { fileOperationsMap, typeMap, ctrlOrCmd, isMac, transferTypeMap, maxEditFileSize } from '../../common/constants'
 import { copy as copyToClipboard, readClipboard, hasFileInClipboardText } from '../../common/clipboard'
-import { getDropFileList } from '../../common/file-drop-utils'
+import { refsStatic } from '../common/ref'
+import { getDropFileList, getFilePath } from '../../common/file-drop-utils'
+import { getFolderFromFilePath } from './file-read'
 import { createTransferProps } from './transfer-common'
 import generate from '../../common/uid'
 import sanitizeFilename from '../../common/sanitize-filename'
+import ExtIcon from './file-icon'
+import { autoRun } from 'manate'
+
+// Binary/non-text file extensions that should not be opened in the text editor
+const binaryExtensions = new Set([
+  'doc', 'docx', 'xls', 'xlsx', 'ppt', 'pptx', 'pdf', 'odt', 'ods', 'odp',
+  'rtf', 'pages', 'numbers', 'key',
+  'jpg', 'jpeg', 'png', 'gif', 'bmp', 'ico', 'svg', 'webp', 'tiff', 'tif',
+  'psd', 'ai', 'eps', 'raw', 'cr2', 'nef', 'heic', 'heif', 'avif',
+  'mp4', 'avi', 'mkv', 'mov', 'wmv', 'flv', 'webm', 'm4v', 'mpg', 'mpeg', '3gp', 'ts',
+  'mp3', 'wav', 'flac', 'aac', 'ogg', 'wma', 'm4a', 'opus', 'mid', 'midi',
+  'zip', 'rar', '7z', 'tar', 'gz', 'bz2', 'xz', 'zst', 'lz4', 'cab', 'iso', 'dmg', 'img',
+  'exe', 'dll', 'so', 'dylib', 'bin', 'dat', 'db', 'sqlite', 'mdb',
+  'class', 'jar', 'war', 'pyc', 'pyo', 'o', 'obj', 'lib', 'a',
+  'ttf', 'otf', 'woff', 'woff2', 'eot',
+  'torrent', 'bak', 'tmp', 'swf', 'fla'
+])
+
+function isEditableFile (name) {
+  if (!name) return false
+  const ext = name.split('.').pop()?.toLowerCase()
+  return !binaryExtensions.has(ext)
+}
 
 const e = window.translate
 const treeNodeCls = 'tree-node-item'
@@ -53,6 +84,7 @@ export default class TreeView extends Component {
     this._loadingPath = null
     this._initialized = false
     this._internalPathChange = false // Flag to track internal path changes
+    this._transferWatchers = []
   }
 
   componentDidMount () {
@@ -76,6 +108,8 @@ export default class TreeView extends Component {
   componentWillUnmount () {
     document.removeEventListener('click', this.handleClickOutside)
     clearTimeout(this.refreshTimer)
+    this._transferWatchers.forEach(w => w.stop())
+    this._transferWatchers = []
   }
 
   tryInit = () => {
@@ -217,6 +251,11 @@ export default class TreeView extends Component {
       currentNode = currentNode.children[part]
       currentNode.expanded = true
     }
+
+    // Load children of the target directory so it displays content
+    if (currentNode.isDirectory && currentNode.children === null) {
+      await this.loadChildren(currentNode)
+    }
   }
 
   // Expand to path after initialization
@@ -338,8 +377,8 @@ export default class TreeView extends Component {
   }
 
   onDragOver = (e, node) => {
-    if (!node.isDirectory) return
     e.preventDefault()
+    if (!node.isDirectory) return
     e.dataTransfer.dropEffect = 'move'
     e.currentTarget.classList.add(treeDragOverCls)
   }
@@ -399,7 +438,11 @@ export default class TreeView extends Component {
   onDrop = async (e, targetNode) => {
     e.preventDefault()
     e.currentTarget.classList.remove(treeDragOverCls)
-    if (!targetNode.isDirectory) return
+    // For file nodes, use parent directory as the drop target
+    const dropNode = targetNode.isDirectory
+      ? targetNode
+      : this.getParentNode(targetNode.path)
+    if (!dropNode) return
 
     let fromFiles = null
     try {
@@ -413,7 +456,7 @@ export default class TreeView extends Component {
     if (!fromFiles?.length) return
 
     const { type, tab } = this.props
-    const toPath = targetNode.path
+    const toPath = dropNode.path
     const fromType = fromFiles[0].type || type
     const isSameType = fromType === type
 
@@ -460,13 +503,53 @@ export default class TreeView extends Component {
     this.dragPaths = []
     this.selectedPaths.clear()
     this.lastSelectedPath = null
-    this.refreshTimer = setTimeout(() => {
-      this.props.remoteList?.() || this.props.localList?.()
-    }, 500)
+    this.watchTransferComplete(transfers[0].transferBatch, toPath)
   }
 
   handleDragEnd = () => {
     document.querySelectorAll(`.${treeDragOverCls}`).forEach(el => el.classList.remove(treeDragOverCls))
+  }
+
+  // Handle external file drops (from file manager)
+  onExternalDrop = async (e) => {
+    e.preventDefault()
+    const { files } = e.dataTransfer
+    if (!files?.length) return
+
+    const { type, tab } = this.props
+    const currentPath = this.props.currentPath || this.props.remotePath || this.props.localPath || '/'
+    const toPath = currentPath
+
+    // Get file list from dropped files
+    const fromFiles = []
+    for (let i = 0; i < files.length; i++) {
+      const file = files[i]
+      const filePath = getFilePath(file)
+      const fileObj = getFolderFromFilePath(filePath, false)
+      fromFiles.push({
+        ...fileObj,
+        type: typeMap.local
+      })
+    }
+
+    if (!fromFiles.length) return
+
+    // Create transfer list
+    const transferProps = createTransferProps(this.props)
+    const transfers = fromFiles.map(f => ({
+      typeFrom: typeMap.local,
+      typeTo: type,
+      fromPath: f.path,
+      toPath: resolve(toPath, sanitizeFilename(f.name)),
+      fromFile: f,
+      id: generate(),
+      host: tab?.host,
+      tabType: tab?.type,
+      ...transferProps,
+      operation: ''
+    }))
+    this.props.addTransferList(transfers)
+    this.watchTransferComplete(transfers[0].transferBatch, toPath)
   }
 
   // Context menu
@@ -699,6 +782,246 @@ export default class TreeView extends Component {
     this.forceUpdate()
   }
 
+  // Refresh a single tree node by path (reload children from SFTP)
+  refreshTreeNode = async (path) => {
+    const node = this.getNodeByPath(path)
+    if (node && node.children !== null) {
+      node.children = null
+      await this.loadChildren(node)
+      this.forceUpdate()
+    }
+  }
+
+  // Watch transfer batch completion using reactive autoRun
+  watchTransferComplete = (batchId, path) => {
+    const run = autoRun(() => {
+      const remaining = window.store.fileTransfers.filter(t => t.transferBatch === batchId)
+      if (remaining.length === 0) {
+        run.stop()
+        this._transferWatchers = this._transferWatchers.filter(w => w !== run)
+        this.refreshTreeNode(path)
+      }
+    })
+    run.start()
+    this._transferWatchers.push(run)
+  }
+
+  // Context menu actions
+  doTransfer = () => {
+    this.closeContextMenu()
+    const paths = Array.from(this.selectedPaths)
+    const nodes = paths.map(p => this.getNodeByPath(p)).filter(Boolean)
+    const { type, tab } = this.props
+    const transferProps = createTransferProps(this.props)
+    const transfers = nodes.map(node => ({
+      typeFrom: type,
+      typeTo: type === typeMap.local ? typeMap.remote : typeMap.local,
+      fromPath: node.path,
+      toPath: node.path,
+      fromFile: { ...node, size: node.size || 0 },
+      id: generate(),
+      host: tab?.host,
+      tabType: tab?.type,
+      ...transferProps,
+      operation: ''
+    }))
+    this.props.addTransferList(transfers)
+  }
+
+  gotoFolderInTerminal = async () => {
+    this.closeContextMenu()
+    const node = this.getNodeByPath(Array.from(this.selectedPaths)[0])
+    if (!node?.isDirectory) return
+    const { refs } = await import('../common/ref')
+    const term = refs.get('term-' + this.props.tab?.id)
+    if (term?.cd) {
+      this.props.tab.pane = 'terminal'
+      term.cd(node.path)
+    } else {
+      const escaped = node.path.replace(/'/g, "'\\''")
+      this.sendTerminalCmd(`cd '${escaped}'`)
+    }
+  }
+
+  openFile = async () => {
+    this.closeContextMenu()
+    const node = this.getNodeByPath(Array.from(this.selectedPaths)[0])
+    if (!node || node.isDirectory) return
+    window.fs.openFile(node.path).catch(window.store.onError)
+  }
+
+  showInDefaultFileManager = () => {
+    this.closeContextMenu()
+    const node = this.getNodeByPath(Array.from(this.selectedPaths)[0])
+    if (!node) return
+    window.pre.showItemInFolder(node.path)
+  }
+
+  editFile = async () => {
+    this.closeContextMenu()
+    const node = this.getNodeByPath(Array.from(this.selectedPaths)[0])
+    if (!node || node.isDirectory) return
+    if (this.props.type === typeMap.remote && !this.props.sftp) {
+      return
+    }
+    // node.path is the full path (e.g. /root/folder/file.txt), but text-editor
+    // expects path = parent directory and name = filename separately
+    const lastSlash = node.path.lastIndexOf('/')
+    const parentPath = lastSlash > 0 ? node.path.substring(0, lastSlash) : '/'
+    const fileObj = {
+      ...node,
+      type: this.props.type,
+      path: parentPath,
+      name: node.name
+    }
+    const id = 'tree-' + node.path
+    const { refs } = await import('../common/ref')
+    const self = this
+    refs.add(id, {
+      fetchEditorText: async (path, type) => {
+        try {
+          return type === typeMap.remote
+            ? await self.props.sftp.readFile(path)
+            : await window.fs.readFile(path)
+        } catch (err) {
+          window.store.onError(err)
+          return ''
+        }
+      },
+      onSubmitEditFile: async (mode, type, path, text, noClose) => {
+        try {
+          if (type === typeMap.remote) {
+            await self.props.sftp.writeFile(path, text, mode)
+          } else {
+            await window.fs.writeFile(path, text)
+          }
+        } catch (err) {
+          window.store.onError(err)
+        }
+        const editor = refsStatic.get('text-editor')
+        if (editor) {
+          const data = { loading: false }
+          if (!noClose) {
+            data.id = ''
+            data.file = null
+            data.text = ''
+          }
+          editor.setStateProxy(data)
+        }
+        if (!noClose && type === typeMap.remote) {
+          self.refreshNode(node)
+        }
+      },
+      editWithSystemEditor: async (text) => {
+        const { path: filePath, name } = fileObj
+        let tempPath = ''
+        if (fileObj.type === typeMap.local) {
+          tempPath = window.pre.resolve(filePath, name)
+        } else {
+          const uid = generate()
+          tempPath = window.pre.resolve(
+            window.pre.tempDir, `electerm-temp-${uid}-${name}`
+          )
+          await window.fs.writeFile(tempPath, text)
+        }
+        window.fs.openFile(tempPath).catch(window.store.onError)
+      },
+      editWithCustomEditor: async (text, editorCommand) => {
+        const { path: filePath, name } = fileObj
+        let tempPath = ''
+        if (fileObj.type === typeMap.local) {
+          tempPath = window.pre.resolve(filePath, name)
+        } else {
+          const uid = generate()
+          tempPath = window.pre.resolve(
+            window.pre.tempDir, `electerm-temp-${uid}-${name}`
+          )
+          await window.fs.writeFile(tempPath, text)
+        }
+        await window.pre.runGlobalAsync('openFileWithEditor', tempPath, editorCommand)
+      },
+      removeFileEditEvent: () => {}
+    })
+    refsStatic.get('text-editor')?.openEditor({
+      id,
+      file: fileObj
+    })
+  }
+
+  copyFilePath = () => {
+    this.closeContextMenu()
+    const node = this.getNodeByPath(Array.from(this.selectedPaths)[0])
+    if (!node) return
+    copyToClipboard(node.path)
+  }
+
+  selectAll = () => {
+    this.closeContextMenu()
+    const { tree } = this.state
+    if (!tree) return
+    const currentPath = this.props.currentPath || '/'
+    const node = this.getNodeByPath(currentPath)
+    if (!node?.children) return
+    this.selectedPaths.clear()
+    Object.values(node.children).forEach(child => {
+      this.selectedPaths.add(child.path)
+    })
+    this.forceUpdate()
+  }
+
+  refreshNode = async (node) => {
+    this.closeContextMenu()
+    if (!node) return
+    if (node.isDirectory && node.children !== null) {
+      node.children = null
+      await this.loadChildren(node)
+    }
+    this.forceUpdate()
+  }
+
+  editPermission = () => {
+    this.closeContextMenu()
+    const path = Array.from(this.selectedPaths)[0]
+    const node = this.getNodeByPath(path)
+    if (!node) return
+    const lastSlash = node.path.lastIndexOf('/')
+    const parentPath = lastSlash > 0 ? node.path.substring(0, lastSlash) : '/'
+    const fileObj = {
+      ...node,
+      type: this.props.type,
+      path: parentPath,
+      name: node.name
+    }
+    refsStatic.get('file-modal')?.showFileModeModal(
+      {
+        tab: this.props.tab,
+        visible: true
+      },
+      fileObj
+    )
+  }
+
+  showInfo = () => {
+    this.closeContextMenu()
+    const path = Array.from(this.selectedPaths)[0]
+    const node = this.getNodeByPath(path)
+    if (!node) return
+    const lastSlash = node.path.lastIndexOf('/')
+    const parentPath = lastSlash > 0 ? node.path.substring(0, lastSlash) : '/'
+    const fileObj = {
+      ...node,
+      type: this.props.type,
+      path: parentPath,
+      name: node.name
+    }
+    refsStatic.get('file-modal')?.showFileInfoModal({
+      file: fileObj,
+      tab: this.props.tab,
+      visible: true,
+      pid: this.props.sftp?.terminalId
+    })
+  }
+
   // Copy/Cut/Paste
   copyNodes = (isCut = false) => {
     this.closeContextMenu()
@@ -871,9 +1194,7 @@ export default class TreeView extends Component {
               : <span className='tree-leaf-icon' />}
           </span>
           <span className='tree-node-icon'>
-            {node.isDirectory
-              ? (isExpanded ? <FolderOpenOutlined /> : <FolderOutlined />)
-              : <FileOutlined />}
+            <ExtIcon file={node} />
           </span>
           <span className='tree-node-name'>{node.name}</span>
         </div>
@@ -919,23 +1240,82 @@ export default class TreeView extends Component {
     const node = contextMenuPath ? this.getNodeByPath(contextMenuPath) : null
     const hasSelection = this.selectedPaths.size > 0
     const canPaste = hasFileInClipboardText()
+    const { type, tab } = this.props
+    const isLocal = type === typeMap.local
+    const isRemote = type === typeMap.remote
+    const hasHost = !!tab?.host
+    const enableSsh = tab?.enableSsh
+    const isFtp = tab?.type === 'ftp'
+    const isDirectory = node?.isDirectory
+    const transferText = isLocal
+      ? e(transferTypeMap.upload)
+      : e(transferTypeMap.download)
+    const iconType = isLocal
+      ? <CloudUploadOutlined />
+      : <CloudDownloadOutlined />
 
-    const items = [
-      { key: 'newFile', icon: <FileAddOutlined />, label: e('newFile'), onClick: () => this.startCreate(node, false) },
-      { key: 'newFolder', icon: <FolderAddOutlined />, label: e('newFolder'), onClick: () => this.startCreate(node, true) },
-      { type: 'divider' },
-      { key: 'copy', icon: <CopyOutlined />, label: e('copy'), disabled: !hasSelection, extra: `${ctrlOrCmd}+c`, onClick: () => this.copyNodes(false) },
-      { key: 'cut', icon: <ScissorOutlined />, label: e('cut'), disabled: !hasSelection, extra: `${ctrlOrCmd}+x`, onClick: () => this.copyNodes(true) },
-      { key: 'paste', icon: <SnippetsOutlined />, label: e('paste'), disabled: !canPaste, extra: `${ctrlOrCmd}+v`, onClick: () => this.pasteNodes() },
-      { type: 'divider' },
-      { key: 'rename', icon: <EditOutlined />, label: e('rename'), disabled: !node, onClick: () => this.startRename(node) },
-      { key: 'delete', icon: <DeleteOutlined />, label: e('del'), disabled: !hasSelection, danger: true, onClick: () => this.deleteNodes() }
-    ]
+    const items = []
+    if (isDirectory) {
+      items.push({ key: 'enter', icon: <EnterOutlined />, label: e('enter'), onClick: () => this.toggleExpand(node) })
+    }
+    if (hasHost && !isDirectory) {
+      items.push({ key: 'transfer', icon: iconType, label: transferText, onClick: () => this.doTransfer() })
+    }
+    if (isDirectory && ((hasHost && enableSsh !== false && isRemote) || (isLocal && !hasHost)) && !isFtp) {
+      items.push({ key: 'gotoTerminal', icon: <CodeOutlined />, label: e('gotoFolderInTerminal'), onClick: () => this.gotoFolderInTerminal() })
+    }
+    items.push({ type: 'divider' })
+    if (isLocal && node && !isDirectory) {
+      items.push({ key: 'open', icon: <EnterOutlined />, label: e('open'), onClick: () => this.openFile() })
+      items.push({ key: 'showInFileManager', icon: <ContainerOutlined />, label: e('showInDefaultFileMananger'), onClick: () => this.showInDefaultFileManager() })
+    }
+    if (node && !isDirectory && isEditableFile(node.name) && (node.size || 0) < maxEditFileSize) {
+      items.push({ key: 'edit', icon: <EditOutlined />, label: e('edit'), onClick: () => this.editFile() })
+    }
+    items.push({ type: 'divider' })
+    items.push({ key: 'copy', icon: <CopyOutlined />, label: e('copy'), disabled: !hasSelection, extra: `${ctrlOrCmd}+c`, onClick: () => this.copyNodes(false) })
+    items.push({ key: 'cut', icon: <ScissorOutlined />, label: e('cut'), disabled: !hasSelection, extra: `${ctrlOrCmd}+x`, onClick: () => this.copyNodes(true) })
+    items.push({ key: 'paste', icon: <SnippetsOutlined />, label: e('paste'), disabled: !canPaste, extra: `${ctrlOrCmd}+v`, onClick: () => this.pasteNodes() })
+    items.push({ type: 'divider' })
+    items.push({ key: 'rename', icon: <EditOutlined />, label: e('rename'), disabled: !node, onClick: () => this.startRename(node) })
+    if (node) {
+      items.push({ key: 'copyPath', icon: <CopyOutlined />, label: e('copyFilePath'), onClick: () => this.copyFilePath() })
+    }
+    items.push({ key: 'delete', icon: <DeleteOutlined />, label: e('del'), disabled: !hasSelection, danger: true, onClick: () => this.deleteNodes() })
+    items.push({ type: 'divider' })
+    items.push({ key: 'newFile', icon: <FileAddOutlined />, label: e('newFile'), onClick: () => this.startCreate(node, false) })
+    items.push({ key: 'newFolder', icon: <FolderAddOutlined />, label: e('newFolder'), onClick: () => this.startCreate(node, true) })
+    items.push({ type: 'divider' })
+    items.push({ key: 'selectAll', icon: <CheckSquareOutlined />, label: e('selectAll'), extra: `${ctrlOrCmd}+a`, onClick: () => this.selectAll() })
+    items.push({ key: 'refresh', icon: <ReloadOutlined />, label: e('refresh'), onClick: () => this.refreshNode(node) })
+    if (isRemote && !isFtp && node) {
+      items.push({ key: 'editPermission', icon: <LockOutlined />, label: e('editPermission'), onClick: () => this.editPermission() })
+    }
+    if (node) {
+      items.push({ key: 'info', icon: <InfoCircleOutlined />, label: e('info'), onClick: () => this.showInfo() })
+    }
+
+    // Position: always below cursor, limit height to available space
+    const { x: cx, y: cy } = contextMenuPos
+    const pad = 10
+    const spaceBelow = window.innerHeight - cy - pad
+    const spaceAbove = cy - pad
+    // If less than 100px below, show above instead
+    const useAbove = spaceBelow < 100 && spaceAbove > spaceBelow
+    const maxH = useAbove ? spaceAbove : spaceBelow
+    const top = useAbove ? cy - maxH : cy
 
     return (
       <div
         className='tree-context-menu'
-        style={{ position: 'fixed', left: contextMenuPos.x, top: contextMenuPos.y, zIndex: 9999 }}
+        style={{
+          position: 'fixed',
+          left: Math.min(cx, window.innerWidth - 220),
+          top: Math.max(0, top),
+          zIndex: 9999,
+          maxHeight: maxH + 'px',
+          overflowY: 'auto'
+        }}
       >
         <div className='tree-menu-items'>
           {items.map((item, idx) => {
