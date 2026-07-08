@@ -32,6 +32,10 @@
   margin-left 5px
 
 #container
+  .xterm
+    background transparent
+  .xterm-viewport
+    background-color transparent !important
   .xterm-screen::before
     content ''
     position absolute
@@ -167,3 +171,8 @@
   z-index 100
   background var(--main)
   max-width calc(100% - 24px)
+
+.terminal-fontsize-reset
+  position absolute
+  left 8px
+  bottom 4px

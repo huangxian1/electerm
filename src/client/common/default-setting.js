@@ -28,7 +28,7 @@ export default {
   terminalBackgroundTextSize: 48,
   terminalBackgroundTextColor: '#ffffff',
   terminalBackgroundTextFontFamily: 'Maple Mono',
-  rendererType: 'canvas',
+  rendererType: 'dom',
   terminalType: 'xterm-256color',
   keepaliveCountMax: 10,
   keyword2FA: 'verification code,otp,one-time,two-factor,2fa,totp,authenticator,duo,yubikey,security code,mfa,passcode',
@@ -48,6 +48,7 @@ export default {
   sftpPathFollowSsh: false,
   keepaliveInterval: 10000,
   backspaceMode: '^?',
+  shiftEnterMode: '\\n',
   showHiddenFilesOnSftpStart: true,
   terminalInfos: [
     'uptime',

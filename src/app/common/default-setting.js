@@ -24,7 +24,7 @@ module.exports = exports.default = {
   terminalBackgroundFilterBrightness: 1,
   terminalBackgroundFilterGrayscale: 0,
   terminalBackgroundFilterContrast: 1,
-  rendererType: 'canvas',
+  rendererType: 'dom',
   terminalType: 'xterm-256color',
   keepaliveCountMax: 10,
   saveTerminalLogToFile: false,
@@ -42,6 +42,7 @@ module.exports = exports.default = {
   addTimeStampToTermLog: false,
   keepaliveInterval: 10000,
   backspaceMode: '^?',
+  shiftEnterMode: '\\n',
   showHiddenFilesOnSftpStart: true,
   terminalInfos: [
     'uptime',

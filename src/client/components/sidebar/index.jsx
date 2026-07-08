@@ -9,7 +9,8 @@ import {
   PlusCircleOutlined,
   SettingOutlined,
   AppstoreOutlined,
-  ThunderboltOutlined
+  ThunderboltOutlined,
+  AimOutlined
 } from '@ant-design/icons'
 import { Popover } from 'antd'
 import SideBarPanel from './sidebar-panel'
@@ -48,7 +49,8 @@ export default function Sidebar (props) {
     showModal,
     showInfoModal,
     sidebarPanelTab,
-    openWidgetsModal
+    openWidgetsModal,
+    zoom
   } = props
 
   const { store } = window

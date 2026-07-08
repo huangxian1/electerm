@@ -166,6 +166,7 @@ export default auto(function Index (props) {
       'sidebarPanelTab',
       'openWidgetsModal'
     ]),
+    zoom: config.zoom,
     fileTransfers: copiedTransfer,
     transferHistory: copiedHistory,
     pinned

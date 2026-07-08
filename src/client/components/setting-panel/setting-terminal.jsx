@@ -552,6 +552,10 @@ export default class SettingTerminal extends Component {
         {
           this.renderText('terminalWordSeparator', e('terminalWordSeparator'))
         }
+        <div className='pd1b'>Shift+Enter</div>
+        {
+          this.renderText('shiftEnterMode', 'Text to send on Shift+Enter. Use \\n for newline')
+        }
         {
           this.renderCursorStyleSelect()
         }
