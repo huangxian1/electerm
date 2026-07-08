@@ -8,7 +8,6 @@ import {
   PictureOutlined,
   PlusCircleOutlined,
   SettingOutlined,
-  UpCircleOutlined,
   AppstoreOutlined,
   ThunderboltOutlined
 } from '@ant-design/icons'
@@ -37,7 +36,6 @@ const e = window.translate
 export default function Sidebar (props) {
   const {
     height,
-    upgradeInfo,
     settingTab,
     settingItem,
     isSyncingSetting,
@@ -100,10 +98,6 @@ export default function Sidebar (props) {
     }
   }
 
-  const handleShowUpgrade = () => {
-    window.store.upgradeInfo.showUpgradeModal = true
-  }
-
   const {
     onNewSsh,
     openSetting,
@@ -112,12 +106,6 @@ export default function Sidebar (props) {
     openTerminalThemes,
     setLeftSidePanelWidth
   } = store
-  const {
-    showUpgradeModal,
-    upgradePercent,
-    checkingRemoteVersion,
-    shouldUpgrade
-  } = upgradeInfo
   const showSetting = showModal === modals.setting
   const settingActive = showSetting && settingTab === settingMap.setting && settingItem.id === 'setting-common'
   const syncActive = showSetting && settingTab === settingMap.setting && settingItem.id === 'setting-sync'
@@ -275,34 +263,6 @@ export default function Sidebar (props) {
             onClick={openAbout}
           />
         </SideIcon>
-        {
-          isVisible('upgrade') && !checkingRemoteVersion && !showUpgradeModal && shouldUpgrade
-            ? (
-              <Tooltip
-                title={`${e('upgrading')} ${upgradePercent || 0}%`}
-                placement='right'
-              >
-                <div
-                  className='control-icon-wrap'
-                >
-                  <UpCircleOutlined
-                    className='iblock font18 control-icon upgrade-icon'
-                    onClick={handleShowUpgrade}
-                  />
-                  {
-                    showLabels
-                      ? (
-                        <div className='control-icon-label'>
-                          {getSidebarButtonLabel('upgrade')}
-                        </div>
-                        )
-                      : null
-                  }
-                </div>
-              </Tooltip>
-              )
-            : null
-        }
       </div>
       <SidePanel
         sideProps={sideProps}

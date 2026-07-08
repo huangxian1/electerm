@@ -148,12 +148,6 @@ function buildMenu () {
           }
         },
         {
-          label: e('checkUpdate'),
-          click () {
-            globalState.get('win').webContents.send('checkupdate', null)
-          }
-        },
-        {
           label: e('reportIssue'),
           click () {
             shell

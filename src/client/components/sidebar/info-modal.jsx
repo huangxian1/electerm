@@ -10,7 +10,7 @@ import {
   HeartOutlined,
   CloudOutlined
 } from '@ant-design/icons'
-import { Tabs, Button } from 'antd'
+import { Tabs } from 'antd'
 import Modal from '../common/modal'
 import Link from '../common/external-link'
 import LogoElem from '../common/logo-elem'
@@ -22,7 +22,6 @@ import {
   packInfo,
   infoTabs
 } from '../../common/constants'
-import { checkSkipSrc } from '../../common/check-skip-src'
 import './info.styl'
 
 const e = window.translate
@@ -35,35 +34,6 @@ export default auto(function InfoModal (props) {
     if (key === infoTabs.env && !runtimeEnv) {
       window.pre.runGlobalAsync('getEnv').then(env => setRuntimeEnv(env))
     }
-  }
-
-  const renderCheckUpdate = () => {
-    if (window.et.isWebApp || checkSkipSrc(props.installSrc)) {
-      return null
-    }
-    const {
-      onCheckUpdate
-    } = window.store
-    const {
-      upgradeInfo
-    } = props
-    const onCheckUpdating = upgradeInfo.checkingRemoteVersion || upgradeInfo.upgrading
-    const { noUpdateMessage, noUpdateMessageExpires } = upgradeInfo
-    const showMessage = noUpdateMessage && noUpdateMessageExpires && Date.now() < noUpdateMessageExpires
-    return (
-      <div className='mg1b mg2t'>
-        <Button
-          type='primary'
-          loading={onCheckUpdating}
-          onClick={() => onCheckUpdate(true)}
-        >
-          {e('checkForUpdate')}
-        </Button>
-        {showMessage && (
-          <span className='mg1l update-msg'>{noUpdateMessage}</span>
-        )}
-      </div>
-    )
   }
 
   const renderParsed = (obj, depth = 0) => {
@@ -229,7 +199,6 @@ export default auto(function InfoModal (props) {
           <p className='mg1b'>
             <InfoCircleOutlined /> <b className='mg1r'>{window.store.installSrc}</b>
           </p>
-          {renderCheckUpdate()}
         </>
       )
     },

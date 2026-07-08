@@ -50,10 +50,6 @@ class MenuBtn extends PureComponent {
     window.location.reload()
   }
 
-  onCheckUpdate = () => {
-    window.store.onCheckUpdate()
-  }
-
   restart = () => {
     window.store.restart()
   }
@@ -144,14 +140,6 @@ class MenuBtn extends PureComponent {
         func: 'reload',
         icon: 'ReloadOutlined',
         text: e('reload')
-      },
-      // {
-      //   type: 'hr'
-      // },
-      {
-        func: 'onCheckUpdate',
-        icon: 'UpCircleOutlined',
-        text: e('checkForUpdate')
       },
       // {
       //   type: 'hr'

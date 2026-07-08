@@ -28,7 +28,7 @@ module.exports = exports.default = {
   terminalType: 'xterm-256color',
   keepaliveCountMax: 10,
   saveTerminalLogToFile: false,
-  checkUpdateOnStart: true,
+  checkUpdateOnStart: false,
   cursorBlink: false,
   cursorStyle: 'block',
   useSystemTitleBar: false,

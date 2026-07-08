@@ -10,8 +10,7 @@ export const sidebarButtonKeys = [
   'setting',
   'settingSync',
   'widgets',
-  'about',
-  'upgrade'
+  'about'
 ]
 
 export const getSidebarButtonLabel = (key) => {
@@ -25,8 +24,7 @@ export const getSidebarButtonLabel = (key) => {
     setting: e('setting'),
     settingSync: e('settingSync'),
     widgets: e('widgets'),
-    about: e('about'),
-    upgrade: e('upgrade')
+    about: e('about')
   }
   return labels[key] || key
 }

@@ -176,9 +176,6 @@ export default () => {
     // file/info modal
     showFileModal: false,
 
-    // update
-    upgradeInfo: {},
-
     // serial list related
     serials: [],
     loaddingSerials: false,
