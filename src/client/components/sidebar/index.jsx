@@ -11,7 +11,7 @@ import {
   AppstoreOutlined,
   ThunderboltOutlined
 } from '@ant-design/icons'
-import { Tooltip, Popover } from 'antd'
+import { Popover } from 'antd'
 import SideBarPanel from './sidebar-panel'
 import TransferList from './transfer-list'
 import MenuBtn from '../sys-menu/menu-btn'
