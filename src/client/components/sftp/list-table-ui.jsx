@@ -417,6 +417,8 @@ export default class FileListTable extends Component {
             localPath={this.props.localPath}
             getFolderFromFilePath={this.props.getFolderFromFilePath}
             currentPath={this.props.currentPath}
+            uidTree={this.props.uidTree}
+            gidTree={this.props.gidTree}
           />
         </div>
       )

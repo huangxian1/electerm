@@ -349,8 +349,10 @@ export default class TreeView extends Component {
   handleDoubleClick = (node) => {
     if (node.isDirectory) {
       this.toggleExpand(node)
-    } else {
+    } else if (this.props.type === typeMap.local) {
       window.fs.openFile(node.path).catch(window.store.onError)
+    } else {
+      this.editFile()
     }
   }
 
@@ -452,6 +454,11 @@ export default class TreeView extends Component {
 
     if (!fromFiles?.length) {
       fromFiles = getDropFileList(e.dataTransfer)
+      // getDropFileList returns {path: directory, name: filename} — reconstruct full path
+      fromFiles = fromFiles.map(f => ({
+        ...f,
+        fullPath: resolve(f.path, f.name)
+      }))
     }
     if (!fromFiles?.length) return
 
@@ -461,9 +468,8 @@ export default class TreeView extends Component {
     const isSameType = fromType === type
 
     if (isSameType) {
-      // Same type: use mv command via terminal stdin (shares terminal's user permissions)
       for (const f of fromFiles) {
-        const fromPath = f.path
+        const fromPath = f.fullPath || f.path
         const toFilePath = resolve(toPath, sanitizeFilename(f.name))
         try {
           if (type === typeMap.remote) {
@@ -490,7 +496,7 @@ export default class TreeView extends Component {
     const transfers = fromFiles.map(f => ({
       typeFrom: fromType,
       typeTo: type,
-      fromPath: f.path,
+      fromPath: f.fullPath || f.path,
       toPath: resolve(toPath, sanitizeFilename(f.name)),
       fromFile: f,
       id: generate(),
@@ -525,9 +531,11 @@ export default class TreeView extends Component {
     for (let i = 0; i < files.length; i++) {
       const file = files[i]
       const filePath = getFilePath(file)
+      if (!filePath) continue
       const fileObj = getFolderFromFilePath(filePath, false)
       fromFiles.push({
         ...fileObj,
+        fullPath: filePath,
         type: typeMap.local
       })
     }
@@ -539,7 +547,7 @@ export default class TreeView extends Component {
     const transfers = fromFiles.map(f => ({
       typeFrom: typeMap.local,
       typeTo: type,
-      fromPath: f.path,
+      fromPath: f.fullPath,
       toPath: resolve(toPath, sanitizeFilename(f.name)),
       fromFile: f,
       id: generate(),
@@ -812,12 +820,15 @@ export default class TreeView extends Component {
     const paths = Array.from(this.selectedPaths)
     const nodes = paths.map(p => this.getNodeByPath(p)).filter(Boolean)
     const { type, tab } = this.props
+    const destPath = type === typeMap.local
+      ? this.props.remotePath
+      : this.props.localPath
     const transferProps = createTransferProps(this.props)
     const transfers = nodes.map(node => ({
       typeFrom: type,
       typeTo: type === typeMap.local ? typeMap.remote : typeMap.local,
       fromPath: node.path,
-      toPath: node.path,
+      toPath: resolve(destPath, sanitizeFilename(node.name)),
       fromFile: { ...node, size: node.size || 0 },
       id: generate(),
       host: tab?.host,
@@ -847,11 +858,15 @@ export default class TreeView extends Component {
     this.closeContextMenu()
     const node = this.getNodeByPath(Array.from(this.selectedPaths)[0])
     if (!node || node.isDirectory) return
+    if (this.props.type === typeMap.remote) {
+      return this.editFile()
+    }
     window.fs.openFile(node.path).catch(window.store.onError)
   }
 
   showInDefaultFileManager = () => {
     this.closeContextMenu()
+    if (this.props.type !== typeMap.local) return
     const node = this.getNodeByPath(Array.from(this.selectedPaths)[0])
     if (!node) return
     window.pre.showItemInFolder(node.path)
@@ -995,7 +1010,8 @@ export default class TreeView extends Component {
     refsStatic.get('file-modal')?.showFileModeModal(
       {
         tab: this.props.tab,
-        visible: true
+        visible: true,
+        pid: this.props.sftp?.terminalId
       },
       fileObj
     )
@@ -1018,7 +1034,9 @@ export default class TreeView extends Component {
       file: fileObj,
       tab: this.props.tab,
       visible: true,
-      pid: this.props.sftp?.terminalId
+      pid: this.props.sftp?.terminalId,
+      uidTree: this.props.uidTree,
+      gidTree: this.props.gidTree
     })
   }
 

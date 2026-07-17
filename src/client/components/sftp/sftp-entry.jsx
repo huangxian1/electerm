@@ -1599,6 +1599,8 @@ export default class Sftp extends Component {
       localPath: this.state.localPath,
       getFolderFromFilePath,
       currentPath: isRemote ? this.state.remotePath : this.state.localPath,
+      uidTree: this.state[`${type}UidTree`],
+      gidTree: this.state[`${type}GidTree`],
       ...this.props,
       ...pick(
         this,

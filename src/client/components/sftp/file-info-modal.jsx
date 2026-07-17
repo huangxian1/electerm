@@ -342,9 +342,9 @@ export default class FileMode extends React.PureComponent {
             <p className='bold'>{e('fullPath')}:</p>
             <p className='pd1b'>{ffp}</p>
             <p className='bold'>{e('owner')}</p>
-            <p className='pd1b'>{uidTree['' + owner]}</p>
+            <p className='pd1b'>{uidTree?.['' + owner] ?? owner}</p>
             <p className='bold'>{e('group')}</p>
-            <p className='pd1b'>{gidTree['' + group]}</p>
+            <p className='pd1b'>{gidTree?.['' + group] ?? group}</p>
             {this.renderSizeRow()}
             <p className='bold'>{e('accessTime')}:</p>
             <p className='pd1b'>{formatTime(accessTime)}</p>
