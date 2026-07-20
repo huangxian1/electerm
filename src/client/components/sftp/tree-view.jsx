@@ -267,6 +267,47 @@ export default class TreeView extends Component {
     this.forceUpdate()
   }
 
+  // Collect all expanded directory paths from the tree
+  getExpandedPaths = (node) => {
+    const paths = []
+    if (node.expanded && node.children) {
+      paths.push(node.path)
+      Object.values(node.children).forEach(child => {
+        if (child.isDirectory) {
+          paths.push(...this.getExpandedPaths(child))
+        }
+      })
+    }
+    return paths
+  }
+
+  // Refresh all expanded directories without collapsing them
+  refreshExpandedDirs = async () => {
+    const { tree } = this.state
+    if (!tree) return
+
+    const root = tree['/']
+    if (!root) return
+
+    // Collect expanded paths before refresh
+    const expandedPaths = this.getExpandedPaths(root)
+
+    // Reload children for each expanded node
+    for (const path of expandedPaths) {
+      const node = this.getNodeByPath(path)
+      if (node && node.isDirectory) {
+        node.children = null
+        await this.loadChildren(node)
+      }
+    }
+
+    // Also reload root
+    root.children = null
+    await this.loadChildren(root)
+
+    this.forceUpdate()
+  }
+
   // Toggle expand/collapse
   toggleExpand = async (node) => {
     if (!node.isDirectory) return
